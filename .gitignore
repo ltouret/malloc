@@ -1,3 +1,9 @@
+# custom
+test
+test.c
+*.swp
+malloc
+
 # Prerequisites
 *.d
 
