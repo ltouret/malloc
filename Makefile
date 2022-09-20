@@ -1,8 +1,26 @@
+# **************************************************************************** #
+#                                                                              #
+#                                                         :::      ::::::::    #
+#    Makefile                                           :+:      :+:    :+:    #
+#                                                     +:+ +:+         +:+      #
+#    By: ltouret <ltouret@student.42.fr>            +#+  +:+       +#+         #
+#                                                 +#+#+#+#+#+   +#+            #
+#    Created: 2022/09/19 22:51:45 by ltouret           #+#    #+#              #
+#    Updated: 2022/09/19 23:11:02 by ltouret          ###   ########.fr        #
+#                                                                              #
+# **************************************************************************** #
+
+ifeq ($(HOSTTYPE),)
+	HOSTTYPE := $(shell uname -m)_$(shell uname -s)
+endif
 
 .SUFFIXES:
 .SUFFIXES: .c .o
 
 NAME = malloc
+
+#NAME = libft_malloc_$(HOSTTYPE).so
+#LIB_NAME = libft_malloc.so
 
 SRCS = main.c
 

@@ -6,7 +6,7 @@
 #    By: ltouret <ltouret@student.42.fr>            +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2019/10/20 13:00:20 by ltouret           #+#    #+#              #
-#    Updated: 2020/10/27 23:25:42 by ltouret          ###   ########.fr        #
+#    Updated: 2022/09/19 22:40:54 by ltouret          ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -32,7 +32,7 @@ ft_lstlast.c ft_lstmap.c ft_lstnew.c ft_lstsize.c
 
 OBJS = ${SRCS:.c=.o}
 
-CC		= gcc
+CC		= cc
 RM		= rm -f
 
 CFLAGS = -Wall -Wextra -Werror
