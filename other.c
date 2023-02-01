@@ -12,7 +12,7 @@
 #define SMALL_SIZE 1400
 #define LARGE_SIZE 5400
 #define ALLOCATIONS 105
-#define TINY_ZONE (((ALLOCATIONS * (BLOCK_SIZE + TINY_SIZE) + ZONE_SIZE) / PAGE) + 1) * PAGE
+#define TINY_ZONE (((ALLOCATIONS * (BLOCK_SIZE + TINY_SIZE) + ZONE_SIZE) / PAGE) + 1) * PAGE // this can most likely be done better
 #define SMALL_ZONE (((ALLOCATIONS * (BLOCK_SIZE + SMALL_SIZE) + ZONE_SIZE) / PAGE) + 1) * PAGE
 
 // ADD tree afer each malloc with size and pointer to go through each time and do the full block in half the time
@@ -61,15 +61,21 @@ void	*create_tiny(size_t size)
 	if (allocs.tiny == NULL)
 	{
 		//printf("tiny %lu tiny_block\n", TINY_ZONE );
-		allocs.tiny = mmap ( NULL, TINY_ZONE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0 );
-		
+		ret = mmap (NULL, TINY_ZONE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
+		allocs.tiny = ret;
 		// init and populate the zone in another func?
 		ft_bzero(allocs.tiny, TINY_ZONE); // ft_bzero needed?
 		allocs.tiny->next = NULL; // already done by ft_bzero
 		//printf("1 allocs.tiny %lu allocs.tiny->next %lu allocs.tiny->block %lu\n", allocs.tiny, &allocs.tiny->type, &allocs.tiny->block);
-		allocs.tiny->block = (void *)allocs.tiny + ZONE_SIZE; 
-		allocs.tiny->free_space = TINY_ZONE - ZONE_SIZE;
-		printf("2 allocs.tiny %lu allocs.tiny->block %lu\n", allocs.tiny, allocs.tiny->block);
+		allocs.tiny->block = ret + ZONE_SIZE;
+		allocs.tiny->free_space = TINY_ZONE - ZONE_SIZE - BLOCK_SIZE;
+		allocs.tiny->type = 0; // 0 is tiny 1 small? with define?
+		printf("1 allocs.tiny %lu allocs.tiny->block %lu\n", allocs.tiny, allocs.tiny->block);
+		allocs.tiny->block->prev = NULL; // already init with bzero
+		allocs.tiny->block->next = ret + ZONE_SIZE + BLOCK_SIZE;
+		allocs.tiny->block->size = allocs.tiny->free_space;
+		allocs.tiny->block->free = 1; // 1 is free, 0 not free
+		printf("2 allocs.tiny %lu allocs.tiny->block %lu\n", allocs.tiny->block, allocs.tiny->block->next);
 	}
 	// else if allocs.tiny isnt null and has free_space
 	else if (0)
@@ -110,5 +116,6 @@ int main()
 {
 	char *five = my_malloc(5);
 	// hex_dump(&allocs, sizeof(t_bucket));
+	printf("page size %d %lu\n", PAGE, TINY_ZONE / 240);
 	ft_bzero(&allocs, sizeof(t_bucket));
 }
