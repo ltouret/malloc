@@ -57,27 +57,40 @@ size_t	go_next_block(size_t size)
 void	*create_tiny(size_t size)
 {
 	void	*ret = NULL;
-	//t_zone	*
+	t_zone *tiny = allocs.tiny;
 	if (allocs.tiny == NULL)
 	{
-		//printf("tiny %lu tiny_block\n", TINY_ZONE );
+		// change allocs.tiny to tiny
+		// rework this to be dynamic
+		// create mmap of zone
 		ret = mmap (NULL, TINY_ZONE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
 		allocs.tiny = ret;
+
 		// init and populate the zone in another func?
 		ft_bzero(allocs.tiny, TINY_ZONE); // ft_bzero needed?
+		// create metadata of zone
 		allocs.tiny->next = NULL; // already done by ft_bzero
-		//printf("1 allocs.tiny %lu allocs.tiny->next %lu allocs.tiny->block %lu\n", allocs.tiny, &allocs.tiny->type, &allocs.tiny->block);
 		allocs.tiny->block = ret + ZONE_SIZE;
 		allocs.tiny->free_space = TINY_ZONE - ZONE_SIZE - BLOCK_SIZE;
 		allocs.tiny->type = 0; // 0 is tiny 1 small? with define?
 		printf("1 allocs.tiny %lu allocs.tiny->block %lu\n", allocs.tiny, allocs.tiny->block);
+
+		// create block of size and return to user;
 		allocs.tiny->block->prev = NULL; // already init with bzero
-		allocs.tiny->block->next = ret + ZONE_SIZE + BLOCK_SIZE;
-		allocs.tiny->block->size = allocs.tiny->free_space;
-		allocs.tiny->block->free = 1; // 1 is free, 0 not free
+		allocs.tiny->block->next = ret + ZONE_SIZE + BLOCK_SIZE + size;
+		allocs.tiny->block->size = size;
+		allocs.tiny->block->free = 0; // 1 is free, 0 not free
 		printf("2 allocs.tiny %lu allocs.tiny->block %lu\n", allocs.tiny->block, allocs.tiny->block->next);
+
+		// create last free block
+		allocs.tiny->block->next->prev = allocs.tiny->block; // already init with bzero
+		allocs.tiny->block->next->next = ret + ZONE_SIZE + BLOCK_SIZE + BLOCK_SIZE + size;
+		allocs.tiny->block->next->size = TINY_ZONE - ZONE_SIZE - BLOCK_SIZE - BLOCK_SIZE - size;
+		allocs.tiny->block->next->free = 1; // 1 is free, 0 not free
+		printf("3 allocs.tiny %lu allocs.tiny->block %lu\n", allocs.tiny->block->next, allocs.tiny->block->next->next);
+		// printf("%lu\n", allocs.tiny->block->next->size);
 	}
-	// else if allocs.tiny isnt null and has free_space
+	// else if allocs.tiny isnt null and has free_space - BLOCK_SIZE > 0
 	else if (0)
 	{
 	}
@@ -93,6 +106,7 @@ void	*my_malloc(size_t size)
 {
 	if (size == 0)
 		return NULL;
+	size = go_next_block(size);
 	if (size < TINY_SIZE)
 	{ 
 		create_tiny(size); // check if tiny doesnt exist if it does check tehres space if there is use this
