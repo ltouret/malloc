@@ -151,7 +151,7 @@ void	*my_malloc(size_t size)
 	{ 
 		ret = create_tiny(size); // check if tiny doesnt exist if it does check tehres space if there is use this
 	}
-    return ret;
+	return ret;
 }
 
 // add better format here
@@ -159,13 +159,13 @@ void	*my_malloc(size_t size)
 void	hex_dump(void *s, size_t n)
 {
 	// reading byte by byte now needs to be displayed in hex, 0A for 10 ff for 255, etc
-    size_t i = 0;
-    printf("Hex dump of %lu:\n", s);
-    while (i < n) {
-        printf("%lu %d\n", i, ((char *)s)[i]);
-        i++;
-    }
-    // printf("\n");
+	size_t i = 0;
+	printf("Hex dump of %lu:\n", s);
+	while (i < n) {
+		printf("%lu %d\n", i, ((char *)s)[i]);
+		i++;
+	}
+	// printf("\n");
 }
 
 int main()
