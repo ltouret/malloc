@@ -65,6 +65,7 @@ void	*create_tiny(size_t size)
 		// change allocs.tiny to tiny
 		// rework this to be dynamic
 		// create mmap of zone
+		// aumentar pointer usando current como en el segundo else if, mas limpio q esta wea
 		ret = mmap (NULL, TINY_ZONE_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
 		printf("start of tiny block %lu\n", ret);
 		allocs.tiny = ret;
@@ -112,24 +113,25 @@ void	*create_tiny(size_t size)
 				current->size = size;
 				current->free = 0;
 
-				//current++;
+				printf("im here %lu c size %lu\n", current, current->size);
+				current = current->next;
 
 				// create free block
-				current->next->prev = current;
-				current->next->next = NULL;
+				current->prev = current - 1;
+				current->next = NULL;
 				//current->next->size = allocs.tiny->free_space - BLOCK_SIZE - size;
-				current->next->size = allocs.tiny->free_space - BLOCK_SIZE - size;
-				current->next->free = 1;
+				current->size = allocs.tiny->free_space - BLOCK_SIZE - size;
+				current->free = 1;
 				ret = current->next;
-				printf("im here %lu c size %lu\n", current->next, current->next->size);
+				printf("im here %lu c size %lu\n", current, current->size);
 				break;
 			}
-			// if theres enough free_space but the memory is fragmented then it should create another zone, for now doesnt, should be added here?
-			// theres something wrong with the size of this shit, im counting the size of the free block like used space when i shouldnt somewhere
 			printf("current %lu prev %lu\n", current, current->prev);
 			printf("free space tiny %lu, free block size + BLOCK_SIZE %lu\n", tiny->free_space, current->size );
 			current = current->next;
 		}
+		// if theres enough free_space but the memory is fragmented then it should create another zone, for now doesnt, should be added here?
+		/// else new block here
 	}
 	// else allocs.tiny zone isnt null and theres no free_space so we need to create another mmap in allocs.tiny->next = mmap and bzero sizeof(TINY_ZONE_SIZE)
 	// to init the pointers of the new zone to 0
