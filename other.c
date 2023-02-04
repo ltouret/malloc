@@ -12,7 +12,7 @@
 #define SMALL_SIZE 1400
 #define LARGE_SIZE 5400
 #define ALLOCATIONS 105
-#define TINY_ZONE_SIZE (((ALLOCATIONS * (BLOCK_SIZE + TINY_SIZE) + ZONE_SIZE) / PAGE) + 1) * PAGE // this can most likely be done better // add TINY_ZONE_SIZE_SIZE?
+#define TINY_ZONE_SIZE (((ALLOCATIONS * (BLOCK_SIZE + TINY_SIZE) + ZONE_SIZE) / PAGE) + 1) * PAGE // this can most likely be done better
 #define SMALL_ZONE_SIZE (((ALLOCATIONS * (BLOCK_SIZE + SMALL_SIZE) + ZONE_SIZE) / PAGE) + 1) * PAGE
 
 // TODO
@@ -99,18 +99,35 @@ void	*create_tiny(size_t size)
 	// else if allocs.tiny isnt null and has free_space - (BLOCK_SIZE + size) > 0
 	else if (allocs.tiny && allocs.tiny->free_space - BLOCK_SIZE - size > 0)
 	{
-		t_block *current = allocs.tiny->block;
+		t_block	*current = allocs.tiny->block;
+		void	*ret = NULL;
 		while (current)
 		{
 			if (current->free == 1 && current->size >= BLOCK_SIZE + size) 
 			{
 				// create block here
+				printf("im here %lu c size %lu\n", current, current->size);
+				//current->prev // prev is the same as up?
+				current->next = (void *)current + BLOCK_SIZE + size;
+				current->size = size;
+				current->free = 0;
+
+				//current++;
+
+				// create free block
+				current->next->prev = current;
+				current->next->next = NULL;
+				//current->next->size = allocs.tiny->free_space - BLOCK_SIZE - size;
+				current->next->size = allocs.tiny->free_space - BLOCK_SIZE - size;
+				current->next->free = 1;
+				ret = current->next;
+				printf("im here %lu c size %lu\n", current->next, current->next->size);
+				break;
 			}
 			// if theres enough free_space but the memory is fragmented then it should create another zone, for now doesnt, should be added here?
 			// theres something wrong with the size of this shit, im counting the size of the free block like used space when i shouldnt somewhere
 			printf("current %lu prev %lu\n", current, current->prev);
-		printf("free space tiny %lu, free block size + BLOCK_SIZE %lu\n", tiny->free_space, current->size );
-
+			printf("free space tiny %lu, free block size + BLOCK_SIZE %lu\n", tiny->free_space, current->size );
 			current = current->next;
 		}
 	}
@@ -161,6 +178,6 @@ int main()
 	// hex_dump(five, size);
 	// hex_dump(&allocs, 8);
 	char *one = my_malloc(size);
-	printf("page size %d %lu\n", PAGE, TINY_ZONE_SIZE / 240);
+	printf("page size %d %lu %lu\n", PAGE, TINY_ZONE_SIZE, TINY_ZONE_SIZE/ 240);
 	// ft_bzero(&allocs, sizeof(t_bucket));
 }
