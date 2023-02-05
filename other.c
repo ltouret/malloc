@@ -56,6 +56,54 @@ size_t	go_next_block(size_t size)
 	return (size + 15) & ~ 15;
 }
 
+void	*myfree(void *ptr)
+{
+	// if all blocks are free, then call munmap -> zone->free_space - ZONE_SIZE;
+	// everytime free is called, check if prev is null & is feee, if its not 'merge' with the block that is currently being freed 
+	// if ptr null then do nuthing
+	if (ptr == NULL)
+		return ;
+	t_block *metadata = ptr - BLOCK_SIZE;
+	t_zone *zone = NULL;
+	if (metadata->size <= TINY_SIZE)
+		zone = allocs.tiny;
+	else if (metadata->size <= SMALL_SIZE)
+		zone = allocs.small;
+	else
+	{
+		// zone = allocs.large;
+		// call munmap directly and return
+		return ;
+	}
+	printf("ptr %lu meta %lu\n", ptr, metadata);
+	metadata->free = 1;
+	zone->free_space -= metadata->size;
+	if (metadata->prev && metadata->prev->free)
+	{
+		// merge free blocks
+		t_block *prev = metadata->prev;
+		//metadata->free = 1;
+		zone->free_space -= (BLOCK_SIZE + metadata->size); // does this resta todo o solo parte?
+	}
+	if (metadata->next && metadata->next->free)
+	{
+		// merge free blocks
+		t_block *next = metadata->next;
+		//metadata->free = 1;
+		zone->free_space -= (BLOCK_SIZE + metadata->size); // does this resta todo o solo parte?
+	}
+	if (zone->free_space + ZONE_SIZE == TINY_SIZE)
+	{
+		// call munmap
+	}
+	else if (zone->free_space + ZONE_SIZE == SMALL_SIZE) // else if necessary
+	{
+		// call munmap
+	}
+	return ;
+}
+
+// adapt this to use it with small zones too
 void	*create_tiny(size_t size)
 {
 	void	*ret = NULL;
@@ -94,6 +142,7 @@ void	*create_tiny(size_t size)
 		allocs.tiny->block->next->free = 1; // 1 is free, 0 not free
 		printf("3 free size after the metadata %lu allocs.tiny->block %lu\n", allocs.tiny->block->next + 1, allocs.tiny->block->next->next);
 
+		printf("ret %lu\n", allocs.tiny->block + 1);
 		return (allocs.tiny->block + 1);
 		// printf("%lu\n", allocs.tiny->block->next->size);
 	}
@@ -112,33 +161,68 @@ void	*create_tiny(size_t size)
 				current->next = (void *)current + BLOCK_SIZE + size;
 				current->size = size;
 				current->free = 0;
+				ret = current + 1;
 
 				printf("im here %lu c size %lu\n", current, current->size);
 				current = current->next;
 
 				// create free block
-				current->prev = current - 1;
+				current->prev = (void *)current - BLOCK_SIZE - size;
 				current->next = NULL;
 				//current->next->size = allocs.tiny->free_space - BLOCK_SIZE - size;
 				current->size = allocs.tiny->free_space - BLOCK_SIZE - size;
 				current->free = 1;
-				ret = current->next;
 				printf("im here %lu c size %lu\n", current, current->size);
-				break;
+				return ret; // or current
+				//break;
 			}
 			printf("current %lu prev %lu\n", current, current->prev);
 			printf("free space tiny %lu, free block size + BLOCK_SIZE %lu\n", tiny->free_space, current->size );
 			current = current->next;
 		}
-		// if theres enough free_space but the memory is fragmented then it should create another zone, for now doesnt, should be added here?
-		/// else new block here
 	}
-	// else allocs.tiny zone isnt null and theres no free_space so we need to create another mmap in allocs.tiny->next = mmap and bzero sizeof(TINY_ZONE_SIZE)
-	// to init the pointers of the new zone to 0
 	else
 	{
+		// if theres enough free_space but the memory is fragmented then it should create another zone, for now doesnt, should be added here?
+		// else new block here
+		// test this
+		// printf("%lu\n", allocs.tiny->block->next->size);
+		// else allocs.tiny zone isnt null and theres no free_space so we need to create another mmap in allocs.tiny->next = mmap and bzero sizeof(TINY_ZONE_SIZE)
+		// to init the pointers of the new zone to 0
+		t_zone *zone_current = allocs.tiny;
+		while (zone_current->next)
+			zone_current = zone_current->next;
+
+		zone_current->next = mmap (NULL, TINY_ZONE_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
+		zone_current = zone_current->next;
+		printf("start of tiny block %lu\n", zone_current);
+
+		// init and populate the zone in another func?
+
+		// create metadata of zone
+		zone_current->next = NULL; 
+		zone_current->block = ret + ZONE_SIZE; 
+		zone_current->free_space = TINY_ZONE_SIZE - ZONE_SIZE - BLOCK_SIZE - BLOCK_SIZE - size; 
+		zone_current->type = 0; // 0 is tiny 1 small? with define?
+		printf("1 allocs.tiny %lu allocs.tiny->block %lu\n", zone_current, zone_current->block);
+
+		// create block of size and return to user;
+		zone_current->block->prev = NULL; // already init with bzero
+		zone_current->block->next = ret + ZONE_SIZE + BLOCK_SIZE + size;
+		zone_current->block->size = size;
+		zone_current->block->free = 0; // 1 is free, 0 not free
+		printf("2 allocs.tiny %lu allocs.tiny->block %lu\n", zone_current->block, zone_current->block->next);
+
+		// create last free block
+		zone_current->block->next->prev = zone_current->block; // already init with bzero
+		zone_current->block->next->next = NULL; //
+		zone_current->block->next->size = TINY_ZONE_SIZE - ZONE_SIZE - BLOCK_SIZE - BLOCK_SIZE - size;
+		zone_current->block->next->free = 1; // 1 is free, 0 not free
+		printf("3 free size after the metadata %lu allocs.tiny->block %lu\n", zone_current->block->next + 1, zone_current->block->next->next);
+
+		printf("ret %lu\n", zone_current->block + 1);
+		return (zone_current->block + 1);
 	}
-	return ret;
 }
 
 void	*my_malloc(size_t size)
@@ -147,7 +231,7 @@ void	*my_malloc(size_t size)
 	if (size == 0)
 		return NULL;
 	size = go_next_block(size);
-	if (size < TINY_SIZE)
+	if (size <= TINY_SIZE)
 	{ 
 		ret = create_tiny(size); // check if tiny doesnt exist if it does check tehres space if there is use this
 	}
@@ -180,6 +264,8 @@ int main()
 	// hex_dump(five, size);
 	// hex_dump(&allocs, 8);
 	char *one = my_malloc(size);
-	printf("page size %d %lu %lu\n", PAGE, TINY_ZONE_SIZE, TINY_ZONE_SIZE/ 240);
+	printf("first %lu sec %lu\n", five, one);
+	myfree(one);
+	//printf("page size %d %lu %lu\n", PAGE, TINY_ZONE_SIZE, TINY_ZONE_SIZE/ 240);
 	// ft_bzero(&allocs, sizeof(t_bucket));
 }
