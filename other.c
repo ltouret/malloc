@@ -62,8 +62,9 @@ size_t go_next_block(size_t size)
 void *myfree(void *ptr)
 {
 	// if all blocks are free, then call munmap -> zone->free_space - ZONE_SIZE;
-	// everytime free is called, check if prev is null & is feee, if its not 'merge' with the block that is currently being freed
+	// everytime free is called, check if prev is null & is free, if its not 'merge' with the block that is currently being freed
 	// if ptr null then do nuthing
+	// TODO forgot to check if im in the good zone, need to do some math if ptr < zone + ZONE_SIZE
 	if (ptr == NULL)
 		return;
 	t_block *metadata = ptr - BLOCK_SIZE;
@@ -74,6 +75,7 @@ void *myfree(void *ptr)
 		zone = allocs.small;
 	else
 	{
+		// if its a large malloc call munmap and stop func here
 		// zone = allocs.large;
 		// call munmap directly and return
 		return;
@@ -81,38 +83,49 @@ void *myfree(void *ptr)
 	printf("ptr %lu meta %lu\n", ptr, metadata);
 	metadata->free = 1;
 	zone->free_space -= metadata->size;
+	// this is to defrag
 	// en que sentido intento el merge? primero a prev y dps a next?
 	if (metadata->prev && metadata->prev->free)
 	{
 		// merge free blocks
+		// if next is null does this work?
 		t_block *prev = metadata->prev;
 		t_block *next = metadata->next;
 		prev->size += BLOCK_SIZE + metadata->size;
 		prev->next = metadata->next;
 		if (next)
 			next->prev = prev;
-		//metadata->next = ;
-		// metadata->free = 1;
-		zone->free_space -= (BLOCK_SIZE + metadata->size); // does this resta todo o solo parte?
+		// metadata->next = ;
+		//  metadata->free = 1;
+		zone->free_space += (BLOCK_SIZE + metadata->size); // does this resta todo o solo parte?
 		metadata = prev;
 	}
 	// does this die if prev was free? maybe as its not updated with new changes to linked list
 	if (metadata->next && metadata->next->free)
 	{
 		// merge free blocks
-		t_block *prev = metadata->prev;
+		// if next next is null does this work?
+		// t_block *prev = metadata->prev;
+		t_block *after_next = metadata->next->next;
 		t_block *next = metadata->next;
+		metadata->next = after_next;
+		metadata->size += BLOCK_SIZE + next->size;
 		// next
-		if (prev)
+		if (after_next)
 		{
-
+			after_next->prev = metadata;
+			// prev->next = next;
 		}
+		// else
+		// metadata->next
 		// metadata->free = 1;
-		zone->free_space -= (BLOCK_SIZE + metadata->size); // does this resta todo o solo parte?
+		zone->free_space += (BLOCK_SIZE + metadata->size); // does this resta todo o solo parte?
 	}
+	// free (munmap) if all blocks in a zone are free
 	if (zone->free_space + ZONE_SIZE == TINY_SIZE)
 	{
 		// call munmap
+
 	}
 	else if (zone->free_space + ZONE_SIZE == SMALL_SIZE) // else if necessary
 	{
