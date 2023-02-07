@@ -9,8 +9,8 @@
 #define PAGE getpagesize()
 
 #define TINY_SIZE 240
-#define SMALL_SIZE 1400
-#define LARGE_SIZE 5400
+#define SMALL_SIZE 1400 // should be more
+#define LARGE_SIZE 5400 // should be more
 #define ALLOCATIONS 105
 #define TINY_ZONE_SIZE (((ALLOCATIONS * (BLOCK_SIZE + TINY_SIZE) + ZONE_SIZE) / PAGE) + 1) * PAGE // this can most likely be done better
 #define SMALL_ZONE_SIZE (((ALLOCATIONS * (BLOCK_SIZE + SMALL_SIZE) + ZONE_SIZE) / PAGE) + 1) * PAGE
@@ -54,12 +54,16 @@ void ft_bzero(void *s, size_t n)
 	}
 }
 
+// TODO
+// what me gonna do with show_mem_alloc if its 16 each time?
+// could keep size user gives me and malloc go_next_block anyway?
+// and call get_next each time i need but keep in variable user size 
 size_t go_next_block(size_t size)
 {
 	return (size + 15) & ~15;
 }
 
-void *myfree(void *ptr)
+void myfree(void *ptr)
 {
 	// if all blocks are free, then call munmap -> zone->free_space - ZONE_SIZE;
 	// everytime free is called, check if prev is null & is free, if its not 'merge' with the block that is currently being freed
