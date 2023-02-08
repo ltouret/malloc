@@ -57,11 +57,15 @@ void ft_bzero(void *s, size_t n)
 // TODO
 // what me gonna do with show_mem_alloc if its 16 each time?
 // could keep size user gives me and malloc go_next_block anyway?
-// and call get_next each time i need but keep in variable user size 
+// and call get_next each time i need but keep in variable user size
 size_t go_next_block(size_t size)
 {
 	return (size + 15) & ~15;
 }
+
+/*
+	// create func that iterates through the zones and prints info about every zone, and block.
+*/
 
 void myfree(void *ptr)
 {
@@ -74,9 +78,19 @@ void myfree(void *ptr)
 	t_block *metadata = ptr - BLOCK_SIZE;
 	t_zone *zone = NULL;
 	if (metadata->size <= TINY_SIZE)
+	{
 		zone = allocs.tiny;
-	else if (metadata->size <= SMALL_SIZE)
+		printf("ptr %lu, zone %lu, math %lu, check %d\n", ptr, zone, (void *)zone + TINY_ZONE_SIZE, ptr <= (void *)zone + TINY_ZONE_SIZE);
+		while (ptr > (void *)zone + TINY_ZONE_SIZE && zone->next) // does this zone work? // this could break something i think if memory is in a weird 
+		{
+			zone = zone->next;
+		}
+	}
+	else if (metadata->size > TINY_SIZE && metadata->size <= SMALL_SIZE)
+	{
 		zone = allocs.small;
+		printf("ptr %lu, zone %lu, check %d\n", ptr, zone, ptr < zone + SMALL_ZONE_SIZE);
+	}
 	else
 	{
 		// if its a large malloc call munmap and stop func here
@@ -129,7 +143,6 @@ void myfree(void *ptr)
 	if (zone->free_space + ZONE_SIZE == TINY_SIZE)
 	{
 		// call munmap
-
 	}
 	else if (zone->free_space + ZONE_SIZE == SMALL_SIZE) // else if necessary
 	{
@@ -299,6 +312,6 @@ int main()
 	char *one = my_malloc(size);
 	printf("first %lu sec %lu\n", five, one);
 	myfree(one);
-	// printf("page size %d %lu %lu\n", PAGE, TINY_ZONE_SIZE, TINY_ZONE_SIZE/ 240);
+	printf("page size %d %lu %lu\n", PAGE, TINY_ZONE_SIZE, TINY_ZONE_SIZE/ 240);
 	//  ft_bzero(&allocs, sizeof(t_bucket));
 }
