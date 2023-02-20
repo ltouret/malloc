@@ -81,6 +81,7 @@ void myfree(void *ptr)
 	{
 		zone = allocs.tiny;
 		printf("ptr %lu, zone %lu, math %lu, check %d\n", ptr, zone, (void *)zone + TINY_ZONE_SIZE, ptr <= (void *)zone + TINY_ZONE_SIZE);
+		// the ptr needs to be inside the block so (ptr > zone && ptr <= zone + TINY_ZONE_SIZE)
 		while (ptr > (void *)zone + TINY_ZONE_SIZE && zone->next) // does this zone work? // this could break something i think if memory is in a weird 
 		{
 			zone = zone->next;
