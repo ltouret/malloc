@@ -24,15 +24,15 @@ typedef struct s_block
 	struct s_block *next;
 	struct s_block *prev;
 	size_t size;
-	size_t free; // padding
-} t_block;
+	size_t free; // padding // could add here pointer to the start of the zone, and check free with bitwise operator in free. wouldnt need to do (ptr > zone && ptr <= zone + TINY_ZONE_SIZE)
+} t_block; // to check if block belogns to zone in tiny or small blocks
 
 typedef struct s_zone
 {
 	struct s_zone *next;
 	t_block *block;
 	size_t free_space;
-	size_t type; // padding
+	size_t type; // padding // same as in tiny
 } t_zone;
 
 typedef struct s_bucket
@@ -82,8 +82,10 @@ void myfree(void *ptr)
 		zone = allocs.tiny;
 		printf("ptr %lu, zone %lu, math %lu, check %d\n", ptr, zone, (void *)zone + TINY_ZONE_SIZE, ptr <= (void *)zone + TINY_ZONE_SIZE);
 		// the ptr needs to be inside the block so (ptr > zone && ptr <= zone + TINY_ZONE_SIZE)
-		while (ptr > (void *)zone + TINY_ZONE_SIZE && zone->next) // does this zone work? // this could break something i think if memory is in a weird 
+		while (zone->next) // does this zone work? // this could break something i think if memory is in a weird 
 		{
+			if (ptr > zone && ptr <= zone + TINY_ZONE_SIZE) // this could be added directly to the while loop
+				break;
 			zone = zone->next;
 		}
 	}
@@ -299,6 +301,20 @@ void hex_dump(void *s, size_t n)
 	// printf("\n");
 }
 
+int toggleBit(int n, int k)
+{
+    return (n ^ (1 << (k - 1)));
+}
+
+void printBits(long num)
+{
+   for(int bit=0;bit<(sizeof(unsigned int) * 8); bit++)
+   {
+      printf("%i ", num & 0x01);
+      num = num >> 1;
+   }
+}
+
 int main()
 {
 	size_t size = 5;
@@ -315,4 +331,14 @@ int main()
 	myfree(one);
 	printf("page size %d %lu %lu\n", PAGE, TINY_ZONE_SIZE, TINY_ZONE_SIZE/ 240);
 	//  ft_bzero(&allocs, sizeof(t_bucket));
+	// toogle byte!
+	int tst = -2147483648;
+	printf("max %lu %d\n", tst, (int) tst);
+	// tst ^= (1u << 31);
+
+	// tst ^= (1u << 31);
+	// tst ^= (1u << 30);
+	// tst ^= (1u << 29);
+	printf("max %lu %d\n", tst, (int) tst);
+	printBits(tst);
 }
