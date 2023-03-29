@@ -16,7 +16,6 @@
 #define SMALL_ZONE_SIZE (((ALLOCATIONS * (BLOCK_SIZE + SMALL_SIZE) + ZONE_SIZE) / PAGE) + 1) * PAGE
 
 // TODO
-// TODO
 // ADD tree afer each malloc with size and pointer to go through each time and do the full block in half the time
 // add define for FREE & NOT FREE
 
