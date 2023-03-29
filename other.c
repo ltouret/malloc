@@ -93,6 +93,12 @@ void myfree(void *ptr)
 	{
 		zone = allocs.small;
 		printf("ptr %lu, zone %lu, check %d\n", ptr, zone, ptr < zone + SMALL_ZONE_SIZE);
+		while (zone->next) // does this zone work? // this could break something i think if memory is in a weird 
+		{
+			if (ptr > zone && ptr <= zone + TINY_ZONE_SIZE) // this could be added directly to the while loop
+				break;
+			zone = zone->next;
+		}
 	}
 	else
 	{
@@ -103,9 +109,14 @@ void myfree(void *ptr)
 	}
 	printf("ptr %lu meta %lu\n", ptr, metadata);
 	metadata->free = 1;
-	zone->free_space -= metadata->size;
+	printf("zone free %lu\n", zone->free_space);
+	// TODO for me free five breaks cos of this
+	zone->free_space += metadata->size + BLOCK_SIZE;
+	printf("zone free %lu\n", zone->free_space);
 	// this is to defrag
 	// en que sentido intento el merge? primero a prev y dps a next?
+	printf("free_space + ZONE_SIZE %lu TINY_SIZE %lu TINY_ZONE_SIZE %lu ZONE %lu\n", zone->free_space + ZONE_SIZE, TINY_SIZE, TINY_ZONE_SIZE, ZONE_SIZE);
+	//printf("prev %lu prev-free %lu\n", metadata->prev, metadata->prev->free);
 	if (metadata->prev && metadata->prev->free)
 	{
 		// merge free blocks
@@ -118,10 +129,12 @@ void myfree(void *ptr)
 			next->prev = prev;
 		// metadata->next = ;
 		//  metadata->free = 1;
-		zone->free_space += (BLOCK_SIZE + metadata->size); // does this resta todo o solo parte?
+		// TODO this is bad
+		// zone->free_space += (BLOCK_SIZE + metadata->size); // does this resta todo o solo parte?
 		metadata = prev;
 	}
 	// does this die if prev was free? maybe as its not updated with new changes to linked list
+	printf("next %lu next-free %lu\n", metadata->next, metadata->next->free);
 	if (metadata->next && metadata->next->free)
 	{
 		// merge free blocks
@@ -130,7 +143,9 @@ void myfree(void *ptr)
 		t_block *after_next = metadata->next->next;
 		t_block *next = metadata->next;
 		metadata->next = after_next;
+		printf("in next after_next %lu next %lu metadata->size %lu\n", after_next, next, metadata->size);
 		metadata->size += BLOCK_SIZE + next->size;
+		printf("in next after_next %lu next %lu metadata->size %lu\n", after_next, next, metadata->size);
 		// next
 		if (after_next)
 		{
@@ -140,9 +155,12 @@ void myfree(void *ptr)
 		// else
 		// metadata->next
 		// metadata->free = 1;
-		zone->free_space += (BLOCK_SIZE + metadata->size); // does this resta todo o solo parte?
+		// TODO this is bad
+		// zone->free_space += (BLOCK_SIZE + next->size); // does this resta todo o solo parte?
 	}
 	// free (munmap) if all blocks in a zone are free
+	printf("free_space + ZONE_SIZE %lu TINY_SIZE %lu TINY_ZONE_SIZE %lu ZONE %lu\n", zone->free_space + ZONE_SIZE, TINY_SIZE, TINY_ZONE_SIZE, ZONE_SIZE);
+	// TODO this two if fail free_space + 32 will never be 240 fix
 	if (zone->free_space + ZONE_SIZE == TINY_SIZE)
 	{
 		// call munmap
@@ -223,12 +241,15 @@ void *create_tiny(size_t size)
 				// current->next->size = allocs.tiny->free_space - BLOCK_SIZE - size;
 				current->size = allocs.tiny->free_space - BLOCK_SIZE - size;
 				current->free = 1;
+				allocs.tiny->free_space = allocs.tiny->free_space - BLOCK_SIZE - size;
 				printf("im here %lu c size %lu\n", current, current->size);
+				//printf("current %lu prev %lu\n", current, current->prev);
+				//printf("free space tiny %lu, free block size + BLOCK_SIZE %lu\n", tiny->free_space, current->size + BLOCK_SIZE);
 				return ret; // or current
 							// break;
 			}
 			printf("current %lu prev %lu\n", current, current->prev);
-			printf("free space tiny %lu, free block size + BLOCK_SIZE %lu\n", tiny->free_space, current->size);
+			printf("free space tiny %lu, free block size + BLOCK_SIZE %lu\n", tiny->free_space, current->size + BLOCK_SIZE);
 			current = current->next;
 		}
 	}
@@ -327,18 +348,20 @@ int main()
 	// hex_dump(five, size);
 	// hex_dump(&allocs, 8);
 	char *one = my_malloc(size);
-	printf("first %lu sec %lu\n", five, one);
+	printf("first %lu sec %lu = %lu\n", five, one, one - five);
+	// TODO free five alone breaks wtf
+	myfree(five);
 	myfree(one);
 	printf("page size %d %lu %lu\n", PAGE, TINY_ZONE_SIZE, TINY_ZONE_SIZE/ 240);
 	//  ft_bzero(&allocs, sizeof(t_bucket));
 	// toogle byte!
-	int tst = -2147483648;
-	printf("max %lu %d\n", tst, (int) tst);
+	//int tst = -2147483648;
+	//printf("max %lu %d\n", tst, (int) tst);
 	// tst ^= (1u << 31);
 
 	// tst ^= (1u << 31);
 	// tst ^= (1u << 30);
 	// tst ^= (1u << 29);
-	printf("max %lu %d\n", tst, (int) tst);
-	printBits(tst);
+	//printf("max %lu %d\n", tst, (int) tst);
+	//printBits(tst);
 }
