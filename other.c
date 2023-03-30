@@ -116,15 +116,17 @@ void myfree(void *ptr)
 	// this is to defrag
 	// en que sentido intento el merge? primero a prev y dps a next?
 	printf("free_space + ZONE_SIZE %lu TINY_SIZE %lu TINY_ZONE_SIZE %lu ZONE %lu\n", zone->free_space + ZONE_SIZE, TINY_SIZE, TINY_ZONE_SIZE, ZONE_SIZE);
-	//printf("prev %lu prev-free %lu\n", metadata->prev, metadata->prev->free);
+	printf("prev %lu prev-free %lu\n", metadata->prev, metadata->prev ? metadata->prev->free : 0);
 	if (metadata->prev && metadata->prev->free)
 	{
 		// merge free blocks
 		// if next is null does this work?
 		t_block *prev = metadata->prev;
 		t_block *next = metadata->next;
-		prev->size += BLOCK_SIZE + metadata->size;
 		prev->next = metadata->next;
+		printf("in prev prev %lu next %lu metadata->size %lu\n", prev, next, metadata->size);
+		prev->size += BLOCK_SIZE + metadata->size;
+		printf("in prev prev %lu next %lu metadata->size %lu\n", prev, next, metadata->size);
 		if (next)
 			next->prev = prev;
 		// metadata->next = ;
@@ -134,7 +136,7 @@ void myfree(void *ptr)
 		metadata = prev;
 	}
 	// does this die if prev was free? maybe as its not updated with new changes to linked list
-	printf("next %lu next-free %lu\n", metadata->next, metadata->next->free);
+	printf("next %lu next-free %lu\n", metadata->next, metadata->next ? metadata->next->free : 0);
 	if (metadata->next && metadata->next->free)
 	{
 		// merge free blocks
@@ -161,12 +163,14 @@ void myfree(void *ptr)
 	// free (munmap) if all blocks in a zone are free
 	printf("free_space + ZONE_SIZE %lu TINY_SIZE %lu TINY_ZONE_SIZE %lu ZONE %lu\n", zone->free_space + ZONE_SIZE, TINY_SIZE, TINY_ZONE_SIZE, ZONE_SIZE);
 	// TODO this two if fail free_space + 32 will never be 240 fix
-	if (zone->free_space + ZONE_SIZE == TINY_SIZE)
+	if (zone->free_space + ZONE_SIZE + BLOCK_SIZE == TINY_ZONE_SIZE)
 	{
+		printf("Me tiny and all free\n");
 		// call munmap
 	}
-	else if (zone->free_space + ZONE_SIZE == SMALL_SIZE) // else if necessary
+	else if (zone->free_space + ZONE_SIZE + BLOCK_SIZE == SMALL_ZONE_SIZE)
 	{
+		printf("Me small and all free\n");
 		// call munmap
 	}
 	return;
@@ -194,6 +198,7 @@ void *create_tiny(size_t size)
 		allocs.tiny->next = NULL; // already done by ft_bzero
 		allocs.tiny->block = ret + ZONE_SIZE;
 		allocs.tiny->free_space = TINY_ZONE_SIZE - ZONE_SIZE - BLOCK_SIZE - BLOCK_SIZE - size; // 2 block size cos theres the user block and the free block
+		// printf("FREE %lu\n", allocs.tiny->free_space + BLOCK_SIZE + ZONE_SIZE + size);
 		allocs.tiny->type = 0;																   // 0 is tiny 1 small? with define?
 		printf("1 allocs.tiny %lu allocs.tiny->block %lu\n", allocs.tiny, allocs.tiny->block);
 
@@ -339,19 +344,21 @@ void printBits(long num)
 int main()
 {
 	size_t size = 5;
-	char *five = my_malloc(size);
-	for (size_t i = 0; i < size; ++i)
-	{
-		// printf("%lu\n", i);
-		five[i] = 'a';
-	}
+	char *one = my_malloc(size);
+	char *two = my_malloc(size);
+	// char *three = my_malloc(size);
+	// for (size_t i = 0; i < size; ++i)
+	// {
+	// 	// printf("%lu\n", i);
+	// 	two[i] = 'a';
+	// }
 	// hex_dump(five, size);
 	// hex_dump(&allocs, 8);
-	char *one = my_malloc(size);
-	printf("first %lu sec %lu = %lu\n", five, one, one - five);
+	printf("first %lu sec %lu = %lu\n", two, one, two - one);
 	// TODO free five alone breaks wtf
-	myfree(five);
 	myfree(one);
+	myfree(two);
+	// myfree(three);
 	printf("page size %d %lu %lu\n", PAGE, TINY_ZONE_SIZE, TINY_ZONE_SIZE/ 240);
 	//  ft_bzero(&allocs, sizeof(t_bucket));
 	// toogle byte!
