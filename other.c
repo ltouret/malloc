@@ -3,8 +3,6 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
-// TODO defines should be other thing, maybe an struct with all the data?
-
 #define BUCKET_SIZE sizeof(t_bucket)
 #define ZONE_SIZE sizeof(t_zone)
 #define BLOCK_SIZE sizeof(t_block)
@@ -18,6 +16,7 @@
 #define SMALL_ZONE_SIZE (((ALLOCATIONS * (BLOCK_SIZE + SMALL_SIZE) + ZONE_SIZE) / PAGE) + 1) * PAGE
 
 // TODO
+// defines should be other thing, maybe an struct with all the data?
 // ADD tree afer each malloc with size and pointer to go through each time and do the full block in half the time
 // add define for FREE & NOT FREE
 
@@ -107,6 +106,7 @@ void myfree(void *ptr)
 		// if its a large malloc call munmap and stop func here
 		// zone = allocs.large;
 		// call munmap directly and return
+		printf("Me large and all free\n");
 		return;
 	}
 	printf("ptr %lu meta %lu\n", ptr, metadata);
@@ -188,6 +188,7 @@ void myfree(void *ptr)
 // TODO 
 // if ret == MAP_FAILED then return -1 and stop program
 // adapt this to use it with small zones too
+//  1 is free, 0 not free
 void *create_tiny(size_t size)
 {
 	void *ret = NULL;
@@ -200,11 +201,13 @@ void *create_tiny(size_t size)
 		// aumentar pointer usando current como en el segundo else if, mas limpio q esta wea
 		// if ret == MAP_FAILED then return -1 and stop program
 		ret = mmap(NULL, TINY_ZONE_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
+		if (ret == MAP_FAILED)
+			return NULL;
 		printf("start of tiny block %lu %lu\n", ret, MAP_FAILED);
 		allocs.tiny = ret;
 
 		// init and populate the zone in another func?
-		ft_bzero(allocs.tiny, TINY_ZONE_SIZE); // ft_bzero needed?
+		// ft_bzero(allocs.tiny, TINY_ZONE_SIZE); // ft_bzero needed?
 
 		// create metadata of zone
 		allocs.tiny->next = NULL; // already done by ft_bzero
@@ -280,7 +283,10 @@ void *create_tiny(size_t size)
 	while (zone_current->next)
 		zone_current = zone_current->next;
 
-	zone_current->next = mmap(NULL, TINY_ZONE_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
+	ret = mmap(NULL, TINY_ZONE_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
+	if (ret == MAP_FAILED)
+		return NULL;
+	zone_current->next = ret;
 	zone_current = zone_current->next;
 	printf("start of tiny block %lu\n", zone_current);
 
@@ -319,7 +325,16 @@ void *my_malloc(size_t size)
 	size = go_next_block(size);
 	if (size <= TINY_SIZE)
 	{
+		printf("me tinyyy\n");
 		ret = create_tiny(size); // check if tiny doesnt exist if it does check tehres space if there is use this
+	}
+	else if (size <= SMALL_SIZE)
+	{
+		printf("me smoll\n");
+	}
+	else
+	{
+		printf("me large\n");
 	}
 	return ret;
 }
@@ -356,6 +371,8 @@ void printBits(long num)
 int main()
 {
 	size_t size = 5;
+	// my_malloc(250);
+	// my_malloc(1500);
 	char *one = my_malloc(size);
 	char *two = my_malloc(size);
 	myfree(one);
