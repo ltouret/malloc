@@ -3,6 +3,8 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
+// TODO defines should be other thing, maybe an struct with all the data?
+
 #define BUCKET_SIZE sizeof(t_bucket)
 #define ZONE_SIZE sizeof(t_zone)
 #define BLOCK_SIZE sizeof(t_block)
@@ -165,17 +167,26 @@ void myfree(void *ptr)
 	// TODO this two if fail free_space + 32 will never be 240 fix
 	if (zone->free_space + ZONE_SIZE + BLOCK_SIZE == TINY_ZONE_SIZE)
 	{
+		// add protection if munmap -1?
+		// if ret == MAP_FAILED then return -1 and stop program
 		printf("Me tiny and all free\n");
+		printf("allocs.tiny %lu metadata %lu = %lu\n", allocs.tiny, (void *)metadata - ZONE_SIZE, (void *)metadata - ZONE_SIZE - (void *)allocs.tiny);
+		int n = munmap((void *)metadata - ZONE_SIZE, TINY_ZONE_SIZE);
+		// printf("n %d\n", n);
 		// call munmap
 	}
 	else if (zone->free_space + ZONE_SIZE + BLOCK_SIZE == SMALL_ZONE_SIZE)
 	{
-		printf("Me small and all free\n");
 		// call munmap
+		printf("Me small and all free\n");
+		printf("allocs.tiny %lu metadata %lu = %lu\n", allocs.small, metadata , (void *)metadata - (void *)allocs.small);
+		int n = munmap((void *)metadata - ZONE_SIZE, SMALL_ZONE_SIZE);
 	}
 	return;
 }
 
+// TODO 
+// if ret == MAP_FAILED then return -1 and stop program
 // adapt this to use it with small zones too
 void *create_tiny(size_t size)
 {
@@ -187,8 +198,9 @@ void *create_tiny(size_t size)
 		// rework this to be dynamic
 		// create mmap of zone
 		// aumentar pointer usando current como en el segundo else if, mas limpio q esta wea
+		// if ret == MAP_FAILED then return -1 and stop program
 		ret = mmap(NULL, TINY_ZONE_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
-		printf("start of tiny block %lu\n", ret);
+		printf("start of tiny block %lu %lu\n", ret, MAP_FAILED);
 		allocs.tiny = ret;
 
 		// init and populate the zone in another func?
@@ -346,6 +358,8 @@ int main()
 	size_t size = 5;
 	char *one = my_malloc(size);
 	char *two = my_malloc(size);
+	myfree(one);
+	myfree(two);
 	// char *three = my_malloc(size);
 	// for (size_t i = 0; i < size; ++i)
 	// {
@@ -354,10 +368,10 @@ int main()
 	// }
 	// hex_dump(five, size);
 	// hex_dump(&allocs, 8);
-	printf("first %lu sec %lu = %lu\n", two, one, two - one);
+	// printf("first %lu sec %lu = %lu\n", two, one, two - one);
 	// TODO free five alone breaks wtf
-	myfree(one);
-	myfree(two);
+	// myfree(one);
+	// myfree(two);
 	// myfree(three);
 	printf("page size %d %lu %lu\n", PAGE, TINY_ZONE_SIZE, TINY_ZONE_SIZE/ 240);
 	//  ft_bzero(&allocs, sizeof(t_bucket));
