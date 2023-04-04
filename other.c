@@ -189,11 +189,13 @@ void myfree(void *ptr)
 // if ret == MAP_FAILED then return -1 and stop program
 // adapt this to use it with small zones too
 //  1 is free, 0 not free
-void *create_tiny(size_t size)
+void *create_tiny(t_zone *zone, size_t size)
 {
 	void *ret = NULL;
 	t_zone *tiny = allocs.tiny;
-	if (allocs.tiny == NULL)
+	t_zone *copy = zone;
+	// printf("%lu %lu\n", allocs.tiny, zone);
+	if (zone == NULL)
 	{
 		// change allocs.tiny to tiny
 		// rework this to be dynamic
@@ -320,13 +322,14 @@ void *create_tiny(size_t size)
 void *my_malloc(size_t size)
 {
 	void *ret = NULL;
+	// if 0 or if <= 0 here?
 	if (size == 0)
 		return NULL;
 	size = go_next_block(size);
 	if (size <= TINY_SIZE)
 	{
 		printf("me tinyyy\n");
-		ret = create_tiny(size); // check if tiny doesnt exist if it does check tehres space if there is use this
+		ret = create_tiny(allocs.tiny, size); // check if tiny doesnt exist if it does check tehres space if there is use this
 	}
 	else if (size <= SMALL_SIZE)
 	{
