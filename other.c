@@ -3,6 +3,8 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
+// TODO ASK THIS MATH TO CHATGPT!
+
 #define BUCKET_SIZE sizeof(t_bucket)
 #define ZONE_SIZE sizeof(t_zone)
 #define BLOCK_SIZE sizeof(t_block)
