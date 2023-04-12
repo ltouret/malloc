@@ -358,7 +358,7 @@ void printBits(long num)
 #define DEBUG
 #include <string.h>
 #ifndef __APPLE__
-#include <malloc.h> //!
+#include <malloc.h>
 #endif
 
 int main()
