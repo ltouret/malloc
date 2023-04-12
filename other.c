@@ -194,13 +194,14 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 	if (copy == NULL)
 	{
 		copy = mmap(NULL, type_zone_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
-		if (copy == MAP_FAILED) {
+		if (copy == MAP_FAILED)
+		{
 			printf("First malloc failed\n");
 			return NULL;
 		}
 		*zone = copy;
 
-		//!make a func here to create_metadata
+		//! make a func here to create_metadata
 		// create metadata of zone
 		copy->next = NULL;
 		copy->block = (void *)copy + BLOCK_SIZE;
@@ -242,7 +243,7 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 				current->next->size = copy->free_space - BLOCK_SIZE - size;
 				current->next->free = FREE;
 
-				//update zone free space
+				// update zone free space
 				copy->free_space = current->next->size;
 				return ((void *)current + BLOCK_SIZE);
 			}
@@ -351,10 +352,32 @@ void printBits(long num)
 	}
 }
 
-#include <string.h> //! remove me later on
+//! remove me later on
+// #define DEBUG
+#include <string.h>
+#ifndef __APPLE__
+#include <malloc.h> //!
+#endif
 
 int main()
 {
+	#ifdef DEBUG
+	{
+		void *p = malloc(17);
+		#ifdef __APPLE__
+		size_t block_size = malloc_size(p);
+		#else
+		size_t block_size = malloc_usable_size(p);
+		#endif
+		size_t alignment_padding = block_size;
+
+		printf("Machine word size: %lu bytes\n", sizeof(void *));
+		printf("Alignment of malloc: %lu bytes\n", alignment_padding);
+
+		free(p);
+	}
+	#endif
+
 	size_t size = 5;
 	// my_malloc(250);
 	// my_malloc(1500);
