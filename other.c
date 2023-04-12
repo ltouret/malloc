@@ -267,6 +267,7 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 
 		// create metadata of zone
 		// init and populate the zone in another func?
+		//! init and populate the zone in another func?
 		//! this is most likely the same as what i do if allocs.tiny == NULL so could be moved to another func
 		zone_current->next = NULL;
 		zone_current->block = ret + ZONE_SIZE;
