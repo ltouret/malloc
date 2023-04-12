@@ -294,8 +294,9 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 	}
 }
 
-//! malloc of 0 returns a 24 malloc what do i do in linux, test m1
-//! test malloc size in mac m1
+//TODO
+// if malloc size < 0 malloc returns a ptr size 0
+// if malloc size == 0 malloc returns a ptr size 16 in m1 and 24 on ocean
 void *my_malloc(size_t size)
 {
 	void *ret = NULL;
@@ -353,7 +354,7 @@ void printBits(long num)
 }
 
 //! remove me later on
-// #define DEBUG
+#define DEBUG
 #include <string.h>
 #ifndef __APPLE__
 #include <malloc.h> //!
@@ -363,7 +364,7 @@ int main()
 {
 	#ifdef DEBUG
 	{
-		void *p = malloc(17);
+		void *p = malloc(0);
 		#ifdef __APPLE__
 		size_t block_size = malloc_size(p);
 		#else
