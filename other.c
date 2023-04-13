@@ -153,7 +153,7 @@ void myfree(void *ptr)
 		// zone->free_space += (BLOCK_SIZE + next->size); // does this resta todo o solo parte?
 	}
 	// free (munmap) if all blocks in a zone are free
-	// TODO this two if fail free_space + 32 will never be 240 fix
+	// TODO this two if fail free_space + 32 will never be 240 fix WUT?
 	if (zone->free_space + ZONE_SIZE + BLOCK_SIZE == TINY_ZONE_SIZE)
 	{
 		// add protection if munmap -1?
@@ -189,7 +189,6 @@ void myfree(void *ptr)
 // rename this func?
 void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 {
-	void *ret = NULL;
 	t_zone *copy = *zone;
 	if (copy == NULL)
 	{
@@ -219,7 +218,6 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 		copy->block->next->next = NULL;
 		copy->block->next->size = copy->free_space;
 		copy->block->next->free = FREE;
-
 		return ((void *)copy->block + BLOCK_SIZE);
 	}
 	//! this could be >= to zero maybe need to test after cleaning
@@ -253,16 +251,13 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 	else
 	{
 		//? allocs.tiny zone isnt null and theres no free_space so we need to create another mmap in allocs.tiny->next = mmap and bzero sizeof(TINY_ZONE_SIZE)
-		// to init the pointers of the new zone to 0
-		ret = mmap(NULL, type_zone_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
-		if (ret == MAP_FAILED)
-			return NULL;
-
 		t_zone *zone_current = copy;
 		while (zone_current->next)
 			zone_current = zone_current->next;
 
-		zone_current->next = ret;
+		zone_current->next = mmap(NULL, type_zone_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
+		if (zone_current->next == MAP_FAILED)
+			return NULL;
 		zone_current = zone_current->next;
 
 		// create metadata of zone
@@ -270,28 +265,22 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 		//! init and populate the zone in another func?
 		//! this is most likely the same as what i do if allocs.tiny == NULL so could be moved to another func
 		zone_current->next = NULL;
-		zone_current->block = ret + ZONE_SIZE;
+		zone_current->block = (void *)zone_current + ZONE_SIZE;
 		zone_current->free_space = type_zone_size - ZONE_SIZE - BLOCK_SIZE - BLOCK_SIZE - size;
-		zone_current->type = 0; // 0 is tiny 1 small? with define?
+		zone_current->type = 0; // 0 is tiny 1 small? with define? // this is useless
 
 		// create block of size and return to user;
-		zone_current->block->prev = NULL; // already init with bzero
-		zone_current->block->next = ret + ZONE_SIZE + BLOCK_SIZE + size;
+		zone_current->block->prev = NULL;
+		zone_current->block->next = (void *)zone_current->block + BLOCK_SIZE + size;
 		zone_current->block->size = size;
-		zone_current->block->free = NOTFREE; // 1 is free, 0 not free
+		zone_current->block->free = NOTFREE;
 
 		// create last free block
-		zone_current->block->next->prev = zone_current->block; // already init with bzero
-		zone_current->block->next->next = NULL;				   //
+		zone_current->block->next->prev = zone_current->block;
+		zone_current->block->next->next = NULL;
 		zone_current->block->next->size = type_zone_size - ZONE_SIZE - BLOCK_SIZE - BLOCK_SIZE - size;
-		zone_current->block->next->free = FREE; // 1 is free, 0 not free
-
-		//! this is wrong too
-		// if (size <= 240)
-		// 	allocs.tiny = zone_current;
-		// else
-		// 	allocs.small = zone_current;
-		return (zone_current->block + 1);
+		zone_current->block->next->free = FREE;
+		return ((void *)zone_current->block + BLOCK_SIZE);
 	}
 }
 
@@ -320,6 +309,7 @@ void *my_malloc(size_t size)
 	else
 	{
 		// ????
+		//! Write a function to allocate large zones.
 		printf("me large %d\n", size);
 	}
 	return ret;
@@ -355,7 +345,7 @@ void printBits(long num)
 }
 
 //! remove me later on
-#define DEBUG
+// #define DEBUG
 #include <string.h>
 #ifndef __APPLE__
 #include <malloc.h>
