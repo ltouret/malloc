@@ -184,6 +184,22 @@ void myfree(void *ptr)
 	return;
 }
 
+void create_zone(t_zone *ptr, t_zone *next, size_t free_space)
+{
+	ptr->next = next;
+	ptr->block = (void *)ptr + BLOCK_SIZE;
+	ptr->free_space = free_space;
+	ptr->type = 0; //! this is useless
+}
+
+void create_block(t_block *ptr, t_block *prev, t_block *next, size_t size, size_t free)
+{
+	ptr->prev = prev;
+	ptr->next = next;
+	ptr->size = size;
+	ptr->free = free;
+}
+
 // TODO
 // cut this into smaller funcs
 // rename this func?
@@ -200,24 +216,22 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 		}
 		*zone = copy;
 
-		//! make a func here to create_metadata
-		// create metadata of zone
-		copy->next = NULL;
-		copy->block = (void *)copy + BLOCK_SIZE;
-		copy->free_space = type_zone_size - ZONE_SIZE - BLOCK_SIZE - BLOCK_SIZE - size; // 2 block size cos theres the user block and the free block
+		create_zone(copy, NULL, type_zone_size - ZONE_SIZE - BLOCK_SIZE - BLOCK_SIZE - size);
 
-		//! make a func for this -> create_block
 		// create block of size and return to user;
-		copy->block->prev = NULL;
-		copy->block->next = (void *)copy->block + BLOCK_SIZE + size;
-		copy->block->size = size;
-		copy->block->free = NOTFREE;
+		// copy->block->prev = NULL;
+		// copy->block->next = (void *)copy->block + BLOCK_SIZE + size;
+		// copy->block->size = size;
+		// copy->block->free = NOTFREE;
+		create_block(copy->block, NULL, (void *)copy->block + BLOCK_SIZE + size, size, NOTFREE);
 
 		// create last free block
-		copy->block->next->prev = copy->block;
-		copy->block->next->next = NULL;
-		copy->block->next->size = copy->free_space;
-		copy->block->next->free = FREE;
+		// copy->block->next->prev = copy->block;
+		// copy->block->next->next = NULL;
+		// copy->block->next->size = copy->free_space;
+		// copy->block->next->free = FREE;
+		create_block(copy->block->next, copy->block, NULL, copy->free_space, FREE);
+
 		return ((void *)copy->block + BLOCK_SIZE);
 	}
 	//! this could be >= to zero maybe need to test after cleaning
@@ -230,16 +244,18 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 			if (current->free == FREE && current->size - BLOCK_SIZE >= size)
 			{
 				// create block here
-				current->prev = current->prev; // same as before keeping to not forget
-				current->next = (void *)current + BLOCK_SIZE + size;
-				current->size = size;
-				current->free = NOTFREE;
+				// current->prev = current->prev; // same as before keeping to not forget
+				// current->next = (void *)current + BLOCK_SIZE + size;
+				// current->size = size;
+				// current->free = NOTFREE;
+				create_block(current, current->prev, (void *)current + BLOCK_SIZE + size, size, NOTFREE);
 
 				// create free block
-				current->next->prev = current;
-				current->next->next = NULL;
-				current->next->size = copy->free_space - BLOCK_SIZE - size;
-				current->next->free = FREE;
+				// current->next->prev = current;
+				// current->next->next = NULL;
+				// current->next->size = copy->free_space - BLOCK_SIZE - size;
+				// current->next->free = FREE;
+				create_block(current->next, current, NULL, copy->free_space - BLOCK_SIZE - size, FREE);
 
 				// update zone free space
 				copy->free_space = current->next->size;
