@@ -57,7 +57,7 @@ void ft_bzero(void *s, size_t n)
 }
 
 // TODO
-// what me gonna do with show_mem_alloc if its 16 each time?
+// what me gonna do with show_mem_alloc if its 16 each time? -> this is the behavior of normal malloc all good
 // could keep size user gives me and malloc go_next_block anyway?
 // and call get_next each time i need but keep in variable user size
 size_t go_next_block(size_t size)
@@ -219,17 +219,9 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 		create_zone(copy, NULL, type_zone_size - ZONE_SIZE - BLOCK_SIZE - BLOCK_SIZE - size);
 
 		// create block of size and return to user;
-		// copy->block->prev = NULL;
-		// copy->block->next = (void *)copy->block + BLOCK_SIZE + size;
-		// copy->block->size = size;
-		// copy->block->free = NOTFREE;
 		create_block(copy->block, NULL, (void *)copy->block + BLOCK_SIZE + size, size, NOTFREE);
 
 		// create last free block
-		// copy->block->next->prev = copy->block;
-		// copy->block->next->next = NULL;
-		// copy->block->next->size = copy->free_space;
-		// copy->block->next->free = FREE;
 		create_block(copy->block->next, copy->block, NULL, copy->free_space, FREE);
 
 		return ((void *)copy->block + BLOCK_SIZE);
@@ -244,17 +236,9 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 			if (current->free == FREE && current->size - BLOCK_SIZE >= size)
 			{
 				// create block here
-				// current->prev = current->prev; // same as before keeping to not forget
-				// current->next = (void *)current + BLOCK_SIZE + size;
-				// current->size = size;
-				// current->free = NOTFREE;
 				create_block(current, current->prev, (void *)current + BLOCK_SIZE + size, size, NOTFREE);
 
 				// create free block
-				// current->next->prev = current;
-				// current->next->next = NULL;
-				// current->next->size = copy->free_space - BLOCK_SIZE - size;
-				// current->next->free = FREE;
 				create_block(current->next, current, NULL, copy->free_space - BLOCK_SIZE - size, FREE);
 
 				// update zone free space
@@ -278,24 +262,12 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 
 		//! this and first block are exactly the same calls to the other funcs to i should put this two blocks in another funcs
 		// create metadata of zone
-		// copy->next = NULL;
-		// copy->block = (void *)copy + ZONE_SIZE;
-		// copy->free_space = type_zone_size - ZONE_SIZE - BLOCK_SIZE - BLOCK_SIZE - size;
-		// copy->type = 0; // 0 is tiny 1 small? with define? // this is useless
 		create_zone(copy, NULL, type_zone_size - ZONE_SIZE - BLOCK_SIZE - BLOCK_SIZE - size);
 
 		// create block of size and return to user;
-		// copy->block->prev = NULL;
-		// copy->block->next = (void *)copy->block + BLOCK_SIZE + size;
-		// copy->block->size = size;
-		// copy->block->free = NOTFREE;
 		create_block(copy->block, NULL, (void *)copy->block + BLOCK_SIZE + size, size, NOTFREE);
 
 		// create last free block
-		// copy->block->next->prev = copy->block;
-		// copy->block->next->next = NULL;
-		// copy->block->next->size = copy->free_space;
-		// copy->block->next->free = FREE;
 		create_block(copy->block->next, copy->block, NULL, copy->free_space, FREE);
 		// printf("%lu %lu %lu", copy->block->next->size, 0 , 0);
 		return ((void *)copy->block + BLOCK_SIZE);
@@ -303,8 +275,8 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 }
 
 //TODO
-// if malloc size < 0 malloc returns a ptr size 0
-// if malloc size == 0 malloc returns a ptr size 16 in m1 and 24 on ocean
+//! if malloc size < 0 malloc returns a ptr size 0
+//! if malloc size == 0 malloc returns a ptr size 16 in m1 and 24 on ocean
 void *my_malloc(size_t size)
 {
 	void *ret = NULL;
@@ -362,6 +334,8 @@ void printBits(long num)
 	}
 }
 
+//! idea : code malloc_usable_size ez af and ez bonus!
+
 //! remove me later on
 // #define DEBUG
 #include <string.h>
@@ -400,7 +374,7 @@ int main()
 	// memset(one, "0", 1);
 	printf("page size %d %lu %lu\n", PAGE, TINY_ZONE_SIZE, TINY_ZONE_SIZE / TINY_SIZE);
 	printf("page size %d %lu %lu\n", PAGE, SMALL_ZONE_SIZE, SMALL_ZONE_SIZE / SMALL_SIZE);
-	//  ft_bzero(&allocs, sizeof(t_bucket));
+	// ft_bzero(&allocs, sizeof(t_bucket));
 	// toogle byte!
 	// int tst = -2147483648;
 	// printf("max %lu %d\n", tst, (int) tst);
