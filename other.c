@@ -267,36 +267,38 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 	else
 	{
 		//? allocs.tiny zone isnt null and theres no free_space so we need to create another mmap in allocs.tiny->next = mmap and bzero sizeof(TINY_ZONE_SIZE)
-		t_zone *zone_current = copy;
-		while (zone_current->next)
-			zone_current = zone_current->next;
+		// t_zone *copy = copy;
+		while (copy->next)
+			copy = copy->next;
 
-		zone_current->next = mmap(NULL, type_zone_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
-		if (zone_current->next == MAP_FAILED)
+		copy->next = mmap(NULL, type_zone_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
+		if (copy->next == MAP_FAILED)
 			return NULL;
-		zone_current = zone_current->next;
+		copy = copy->next;
 
+		//! this and first block are exactly the same calls to the other funcs to i should put this two blocks in another funcs
 		// create metadata of zone
-		// init and populate the zone in another func?
-		//! init and populate the zone in another func?
-		//! this is most likely the same as what i do if allocs.tiny == NULL so could be moved to another func
-		zone_current->next = NULL;
-		zone_current->block = (void *)zone_current + ZONE_SIZE;
-		zone_current->free_space = type_zone_size - ZONE_SIZE - BLOCK_SIZE - BLOCK_SIZE - size;
-		zone_current->type = 0; // 0 is tiny 1 small? with define? // this is useless
+		// copy->next = NULL;
+		// copy->block = (void *)copy + ZONE_SIZE;
+		// copy->free_space = type_zone_size - ZONE_SIZE - BLOCK_SIZE - BLOCK_SIZE - size;
+		// copy->type = 0; // 0 is tiny 1 small? with define? // this is useless
+		create_zone(copy, NULL, type_zone_size - ZONE_SIZE - BLOCK_SIZE - BLOCK_SIZE - size);
 
 		// create block of size and return to user;
-		zone_current->block->prev = NULL;
-		zone_current->block->next = (void *)zone_current->block + BLOCK_SIZE + size;
-		zone_current->block->size = size;
-		zone_current->block->free = NOTFREE;
+		// copy->block->prev = NULL;
+		// copy->block->next = (void *)copy->block + BLOCK_SIZE + size;
+		// copy->block->size = size;
+		// copy->block->free = NOTFREE;
+		create_block(copy->block, NULL, (void *)copy->block + BLOCK_SIZE + size, size, NOTFREE);
 
 		// create last free block
-		zone_current->block->next->prev = zone_current->block;
-		zone_current->block->next->next = NULL;
-		zone_current->block->next->size = type_zone_size - ZONE_SIZE - BLOCK_SIZE - BLOCK_SIZE - size;
-		zone_current->block->next->free = FREE;
-		return ((void *)zone_current->block + BLOCK_SIZE);
+		// copy->block->next->prev = copy->block;
+		// copy->block->next->next = NULL;
+		// copy->block->next->size = copy->free_space;
+		// copy->block->next->free = FREE;
+		create_block(copy->block->next, copy->block, NULL, copy->free_space, FREE);
+		// printf("%lu %lu %lu", copy->block->next->size, 0 , 0);
+		return ((void *)copy->block + BLOCK_SIZE);
 	}
 }
 
