@@ -18,8 +18,8 @@
 #define NOTFREE 0
 
 // TODO
-// defines should be other thing, maybe an struct with all the data?
-// ADD tree afer each malloc with size and pointer to go through each time and do the full block in half the time
+// defines should be other thing, maybe an struct with all the data? or call init func that has it somewheeeeere?
+// ADD tree after each malloc with size and pointer to go through each time and do the full block in half the time
 
 typedef struct s_block
 {
@@ -60,6 +60,7 @@ void ft_bzero(void *s, size_t n)
 // what me gonna do with show_mem_alloc if its 16 each time? -> this is the behavior of normal malloc all good
 // could keep size user gives me and malloc go_next_block anyway?
 // and call get_next each time i need but keep in variable user size
+// if called on max size_t this returns 0 check it out
 size_t go_next_block(size_t size)
 {
 	return (size + 15) & ~15;
@@ -184,12 +185,12 @@ void myfree(void *ptr)
 	return;
 }
 
-void create_zone(t_zone *ptr, t_zone *next, size_t free_space)
+void create_zone(t_zone *ptr, size_t free_space)
 {
-	ptr->next = next;
+	ptr->next = NULL;
 	ptr->block = (void *)ptr + BLOCK_SIZE;
 	ptr->free_space = free_space;
-	ptr->type = 0; //! this is useless
+	// ptr->type = 0; //! this is useless
 }
 
 void create_block(t_block *ptr, t_block *prev, t_block *next, size_t size, size_t free)
@@ -198,6 +199,17 @@ void create_block(t_block *ptr, t_block *prev, t_block *next, size_t size, size_
 	ptr->next = next;
 	ptr->size = size;
 	ptr->free = free;
+}
+
+void create_zone_plus_block(t_zone *ptr, size_t size, size_t free_space)
+{
+	create_zone(ptr, free_space - ZONE_SIZE - BLOCK_SIZE - BLOCK_SIZE - size);
+
+		// create block of size and return to user;
+	create_block(ptr->block, NULL, (void *)ptr->block + BLOCK_SIZE + size, size, NOTFREE);
+
+		// create last free block
+	create_block(ptr->block->next, ptr->block, NULL, ptr->free_space, FREE);
 }
 
 // TODO
@@ -216,7 +228,7 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 		}
 		*zone = copy;
 
-		create_zone(copy, NULL, type_zone_size - ZONE_SIZE - BLOCK_SIZE - BLOCK_SIZE - size);
+		create_zone(copy, type_zone_size - ZONE_SIZE - BLOCK_SIZE - BLOCK_SIZE - size);
 
 		// create block of size and return to user;
 		create_block(copy->block, NULL, (void *)copy->block + BLOCK_SIZE + size, size, NOTFREE);
@@ -247,6 +259,7 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 			}
 			current = current->next;
 		}
+		return NULL; //! kind of catch all? if fails then return NULL
 	}
 	else
 	{
@@ -265,7 +278,7 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 
 		//! this and first block are exactly the same calls to the other funcs to i should put this two blocks in another funcs
 		// create metadata of zone
-		create_zone(copy, NULL, type_zone_size - ZONE_SIZE - BLOCK_SIZE - BLOCK_SIZE - size);
+		create_zone(copy, type_zone_size - ZONE_SIZE - BLOCK_SIZE - BLOCK_SIZE - size);
 
 		// create block of size and return to user;
 		create_block(copy->block, NULL, (void *)copy->block + BLOCK_SIZE + size, size, NOTFREE);
@@ -278,24 +291,24 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 }
 
 //TODO
-//! if malloc size < 0 malloc returns a ptr size 0
-//! if malloc size == 0 malloc returns a ptr size 16 in m1 and 24 on ocean
+//! if malloc size < 0 malloc returns a ptr address 0 -> its undefined behavior so idc
+//! if malloc size == 0 malloc returns a ptr size 16 in m1 and 24 on ocean -> so create a allocs.tiny zone of 16
 void *my_malloc(size_t size)
 {
 	void *ret = NULL;
 
-	size = go_next_block(size);
 	if (size == 0)
-		return NULL;
+		size++;
+	size = go_next_block(size); //! check what to do if max size_t
 	if (size <= TINY_SIZE)
 	{
-		const type_zone_size = TINY_ZONE_SIZE; //! erase me later when erase printf
+		const size_t type_zone_size = TINY_ZONE_SIZE; //! erase me later when erase printf
 		// printf("me tiny %lu %d\n", allocs.tiny, size, type_zone_size);
 		ret = create_tiny_small(&allocs.tiny, size, type_zone_size); // check if tiny doesnt exist if it does check tehres space if there is use this
 	}
 	else if (size <= SMALL_SIZE)
 	{
-		const type_zone_size = SMALL_ZONE_SIZE;
+		const size_t type_zone_size = SMALL_ZONE_SIZE; //! erase me later when erase printf
 		// printf("me smoll %lu %d\n", allocs.small, size, type_zone_size);
 		ret = create_tiny_small(&allocs.small, size, type_zone_size); // check if tiny doesnt exist if it does check tehres space if there is use this
 	}
@@ -306,6 +319,14 @@ void *my_malloc(size_t size)
 		printf("me large %d\n", size);
 	}
 	return ret;
+}
+
+//! idea : code malloc_usable_size ez af and ez bonus!
+size_t my_malloc_usable_size(void *ptr)
+{
+	t_block *block = (void *)ptr - BLOCK_SIZE;
+	// printf("%zu\n", block->size);
+	return (block->size);
 }
 
 // add better format here
@@ -337,8 +358,6 @@ void printBits(long num)
 	}
 }
 
-//! idea : code malloc_usable_size ez af and ez bonus!
-
 //! remove me later on
 // #define DEBUG
 #include <string.h>
@@ -362,19 +381,16 @@ int main()
 		printf("Alignment of malloc: %lu bytes\n", alignment_padding);
 
 		free(p);
+		return 0;
 	}
 	#endif
-
 	size_t size = 5;
-	// my_malloc(250);
-	// my_malloc(1500);
 	char *one = my_malloc(size);
 	char *two = my_malloc(size);
 	// char *three = my_malloc(241);
 	myfree(one);
 	myfree(two);
 	// myfree(three);
-	// memset(one, "0", 1);
 	printf("page size %d %lu %lu\n", PAGE, TINY_ZONE_SIZE, TINY_ZONE_SIZE / TINY_SIZE);
 	printf("page size %d %lu %lu\n", PAGE, SMALL_ZONE_SIZE, SMALL_ZONE_SIZE / SMALL_SIZE);
 	// ft_bzero(&allocs, sizeof(t_bucket));
