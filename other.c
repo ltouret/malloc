@@ -257,7 +257,10 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 
 		copy->next = mmap(NULL, type_zone_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
 		if (copy->next == MAP_FAILED)
+		{
+			printf("Second malloc failed\n");
 			return NULL;
+		}
 		copy = copy->next;
 
 		//! this and first block are exactly the same calls to the other funcs to i should put this two blocks in another funcs
