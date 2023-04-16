@@ -193,6 +193,7 @@ void create_zone(t_zone *ptr, size_t free_space)
 	// ptr->type = 0; //! this is useless
 }
 
+//! in create_block if theres not enough space to create teh last free bock it will segfault add protections somewhere -> test what happens if at the end of the zone theres not enough space for a free block
 void create_block(t_block *ptr, t_block *prev, t_block *next, size_t size, size_t free)
 {
 	ptr->prev = prev;
@@ -201,20 +202,21 @@ void create_block(t_block *ptr, t_block *prev, t_block *next, size_t size, size_
 	ptr->free = free;
 }
 
+//! in create_block if theres not enough space to create teh last free bock it will segfault add protections somewhere -> test what happens if at the end of the zone theres not enough space for a free block
 void create_zone_plus_block(t_zone *ptr, size_t size, size_t free_space)
 {
-	create_zone(ptr, free_space - ZONE_SIZE - BLOCK_SIZE - BLOCK_SIZE - size);
-
-		// create block of size and return to user;
+	// create metadata of zone
+	create_zone(ptr, free_space);
+	// create block of size and return to user;
 	create_block(ptr->block, NULL, (void *)ptr->block + BLOCK_SIZE + size, size, NOTFREE);
-
-		// create last free block
+	// create last free block
 	create_block(ptr->block->next, ptr->block, NULL, ptr->free_space, FREE);
 }
 
 // TODO
 // cut this into smaller funcs
 // rename this func?
+//! in create_block if theres not enough space to create teh last free bock it will segfault add protections somewhere -> test what happens if at the end of the zone theres not enough space for a free block
 void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 {
 	t_zone *copy = *zone;
@@ -227,18 +229,11 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 			return NULL;
 		}
 		*zone = copy;
-
-		create_zone(copy, type_zone_size - ZONE_SIZE - BLOCK_SIZE - BLOCK_SIZE - size);
-
-		// create block of size and return to user;
-		create_block(copy->block, NULL, (void *)copy->block + BLOCK_SIZE + size, size, NOTFREE);
-
-		// create last free block
-		create_block(copy->block->next, copy->block, NULL, copy->free_space, FREE);
-
+		create_zone_plus_block(copy, size, type_zone_size - ZONE_SIZE - BLOCK_SIZE - BLOCK_SIZE - size);
 		return ((void *)copy->block + BLOCK_SIZE);
 	}
-	//! this could be >= to zero maybe need to test after cleaning
+	//! this could be >= to zero maybe need to test after cleaning -> the last block could work with 0 to zero maybe? need to test!
+	//? rework this part?
 	else if (copy && copy->free_space - BLOCK_SIZE - size >= 0)
 	{
 		t_block *current = copy->block;
@@ -254,7 +249,11 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 				create_block(current->next, current, NULL, copy->free_space - BLOCK_SIZE - size, FREE);
 
 				// update zone free space
-				copy->free_space = current->next->size;
+				//! check this could be wrong, or theres a better way to protect if theres no last free block at the end of the zone
+				if (current->next)
+					copy->free_space = current->next->size;
+				else
+					copy->free_space = 0;
 				return ((void *)current + BLOCK_SIZE);
 			}
 			current = current->next;
@@ -264,7 +263,6 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 	else
 	{
 		//? allocs.tiny zone isnt null and theres no free_space so we need to create another mmap in allocs.tiny->next = mmap and bzero sizeof(TINY_ZONE_SIZE)
-		// t_zone *copy = copy;
 		while (copy->next)
 			copy = copy->next;
 
@@ -275,17 +273,7 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 			return NULL;
 		}
 		copy = copy->next;
-
-		//! this and first block are exactly the same calls to the other funcs to i should put this two blocks in another funcs
-		// create metadata of zone
-		create_zone(copy, type_zone_size - ZONE_SIZE - BLOCK_SIZE - BLOCK_SIZE - size);
-
-		// create block of size and return to user;
-		create_block(copy->block, NULL, (void *)copy->block + BLOCK_SIZE + size, size, NOTFREE);
-
-		// create last free block
-		create_block(copy->block->next, copy->block, NULL, copy->free_space, FREE);
-		// printf("%lu %lu %lu", copy->block->next->size, 0 , 0);
+		create_zone_plus_block(copy, size, type_zone_size - ZONE_SIZE - BLOCK_SIZE - BLOCK_SIZE - size);
 		return ((void *)copy->block + BLOCK_SIZE);
 	}
 }
