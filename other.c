@@ -234,6 +234,7 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 	}
 	//! this could be >= to zero maybe need to test after cleaning -> the last block could work with 0 to zero maybe? need to test!
 	//? rework this part?
+	//! llego al final del block y no queda espacio para hcer el block de free se rompe no?
 	else if (copy && copy->free_space - BLOCK_SIZE - size >= 0)
 	{
 		t_block *current = copy->block;
@@ -242,6 +243,7 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 			//? current->size - BLOCK_SIZE >= size cos im creating a new block so i need at least BLOCK_SIZE + size of free memory
 			if (current->free == FREE && current->size - BLOCK_SIZE >= size)
 			{
+				printf("hey: %zu %zu ", current->size - BLOCK_SIZE, size);
 				// create block here
 				create_block(current, current->prev, (void *)current + BLOCK_SIZE + size, size, NOTFREE);
 
@@ -250,8 +252,11 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 
 				// update zone free space
 				//! check this could be wrong, or theres a better way to protect if theres no last free block at the end of the zone
+				//? maybe cant go here cos protection of current->size - BLOCK_SIZE means we will never get in part of the code if theres no space to malloc BLOCK_SIZE
 				if (current->next)
-					copy->free_space = current->next->size;
+					printf("free space left in zone %zu\n", current->next->size);
+				if (current->next)
+					copy->free_space = current->next->size; //? this is the true one if need to erase
 				else
 					copy->free_space = 0;
 				return ((void *)current + BLOCK_SIZE);
@@ -372,15 +377,28 @@ int main()
 		return 0;
 	}
 	#endif
-	size_t size = 5;
-	char *one = my_malloc(size);
-	char *two = my_malloc(size);
-	// char *three = my_malloc(241);
-	myfree(one);
-	myfree(two);
-	// myfree(three);
-	printf("page size %d %lu %lu\n", PAGE, TINY_ZONE_SIZE, TINY_ZONE_SIZE / TINY_SIZE);
-	printf("page size %d %lu %lu\n", PAGE, SMALL_ZONE_SIZE, SMALL_ZONE_SIZE / SMALL_SIZE);
+	// size_t size = 5;
+	// char *one = my_malloc(size);
+	// char *two = my_malloc(size);
+	// // char *three = my_malloc(241);
+	// myfree(one);
+	// myfree(two);
+	// // myfree(three);
+	if (1)
+	{
+		const int allo = (TINY_ZONE_SIZE - ZONE_SIZE) / (TINY_SIZE + BLOCK_SIZE);
+		const int size = 256;
+		char *arr[allo + 1];
+		for (size_t i = 0; i < allo; i++)
+		{
+			arr[i] = my_malloc(size);
+			memset(arr[i], '0', size - 1);
+		}
+		arr[allo] = my_malloc(112);
+		my_malloc(1);
+	}
+	printf("page size %d %lu %lu\n", PAGE, TINY_ZONE_SIZE, (TINY_ZONE_SIZE - ZONE_SIZE) / (TINY_SIZE + BLOCK_SIZE));
+	printf("page size %d %lu %lu\n", PAGE, SMALL_ZONE_SIZE, (SMALL_ZONE_SIZE - ZONE_SIZE) / (SMALL_SIZE + BLOCK_SIZE));
 	// ft_bzero(&allocs, sizeof(t_bucket));
 	// toogle byte!
 	// int tst = -2147483648;
