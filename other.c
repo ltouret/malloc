@@ -230,20 +230,20 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 		}
 		*zone = copy;
 		create_zone_plus_block(copy, size, type_zone_size - ZONE_SIZE - BLOCK_SIZE - BLOCK_SIZE - size);
+		printf("first %zu\n", size);
 		return ((void *)copy->block + BLOCK_SIZE);
 	}
 	//! this could be >= to zero maybe need to test after cleaning -> the last block could work with 0 to zero maybe? need to test!
 	//? rework this part?
 	//! llego al final del block y no queda espacio para hcer el block de free se rompe no?
-	else if (copy && copy->free_space - BLOCK_SIZE - size >= 0)
+	else if (copy && copy->free_space >= BLOCK_SIZE + size)
 	{
 		t_block *current = copy->block;
 		while (current)
 		{
-			//? current->size - BLOCK_SIZE >= size cos im creating a new block so i need at least BLOCK_SIZE + size of free memory
-			if (current->free == FREE && current->size - BLOCK_SIZE >= size)
+			//? current->size >= size + BLOCK_SIZE cos im creating a new block so i need at least BLOCK_SIZE + size of free memory
+			if (current->free == FREE && current->size >= size + BLOCK_SIZE)
 			{
-				printf("hey: %zu %zu ", current->size - BLOCK_SIZE, size);
 				// create block here
 				create_block(current, current->prev, (void *)current + BLOCK_SIZE + size, size, NOTFREE);
 
@@ -253,12 +253,12 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 				// update zone free space
 				//! check this could be wrong, or theres a better way to protect if theres no last free block at the end of the zone
 				//? maybe cant go here cos protection of current->size - BLOCK_SIZE means we will never get in part of the code if theres no space to malloc BLOCK_SIZE
-				if (current->next)
-					printf("free space left in zone %zu\n", current->next->size);
-				if (current->next)
-					copy->free_space = current->next->size; //? this is the true one if need to erase
-				else
-					copy->free_space = 0;
+				//! try this and let just enough space to add a last free block of size 0 to check if last if is useful
+				// if (current->next)
+				copy->free_space = current->next->size; //? this is the true one if need to erase
+				printf("curr %zu %zu next %zu %zu %zu\n", current, current->size,current->next, current->next->size, copy->free_space);
+				// else
+					// copy->free_space = 0;
 				return ((void *)current + BLOCK_SIZE);
 			}
 			current = current->next;
@@ -279,6 +279,7 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 		}
 		copy = copy->next;
 		create_zone_plus_block(copy, size, type_zone_size - ZONE_SIZE - BLOCK_SIZE - BLOCK_SIZE - size);
+		printf("new zone %zu\n", size);
 		return ((void *)copy->block + BLOCK_SIZE);
 	}
 }
@@ -384,18 +385,27 @@ int main()
 	// myfree(one);
 	// myfree(two);
 	// // myfree(three);
+	//! try this and let just enough space to add a last free block of size 0 to check if last if is useful
 	if (1)
 	{
-		const int allo = (TINY_ZONE_SIZE - ZONE_SIZE) / (TINY_SIZE + BLOCK_SIZE);
-		const int size = 256;
+		size_t allo = (TINY_ZONE_SIZE - ZONE_SIZE) / (TINY_SIZE + BLOCK_SIZE);
+		size_t size = 256;
 		char *arr[allo + 1];
 		for (size_t i = 0; i < allo; i++)
 		{
+			// size = 256;
+			// arr[i] = my_malloc(size);
+			// memset(arr[i], '0', size - 1);
+			// my_free(arr[i]);
+			size = 256;
 			arr[i] = my_malloc(size);
+			// arr[i] = my_malloc(size);
 			memset(arr[i], '0', size - 1);
 		}
-		arr[allo] = my_malloc(112);
-		my_malloc(1);
+		// myfree(arr[allo - 1]);
+		// arr[allo - 1] = my_malloc(size); //! change this to 128 to test line 390
+		arr[allo] = my_malloc(128); //! change this to 128 to test line 390
+		// my_malloc(16); //!comment this
 	}
 	printf("page size %d %lu %lu\n", PAGE, TINY_ZONE_SIZE, (TINY_ZONE_SIZE - ZONE_SIZE) / (TINY_SIZE + BLOCK_SIZE));
 	printf("page size %d %lu %lu\n", PAGE, SMALL_ZONE_SIZE, (SMALL_ZONE_SIZE - ZONE_SIZE) / (SMALL_SIZE + BLOCK_SIZE));
