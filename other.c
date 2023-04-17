@@ -37,11 +37,13 @@ typedef struct s_zone
 	size_t type; // padding // same as in tiny
 } t_zone;
 
+// TODO
+//! for large erase this, and just have them floating aroung with a block, zone is useless as they are just FREE or NOTFREE and cant be reused once freed
 typedef struct s_bucket
 {
 	t_zone *tiny;
 	t_zone *small;
-	t_zone *large; // this should be something else as large dont have a special "zone", they dont have block (as their blocks dont have next / prev / free) nor free space or type?
+	t_zone *large; //! this should be something else as large dont have a special "zone", they dont have block (as their blocks dont have next / prev / free) nor free space or type?
 } t_bucket;
 
 t_bucket allocs;
@@ -70,7 +72,10 @@ size_t go_next_block(size_t size)
 	// create func that iterates through the zones and prints info about every zone, and block.
 */
 
-void myfree(void *ptr)
+//TODO
+//! forgot to change allocs.tiny, small or large to null if all is freed so this does segfault if i free all and try to use my_malloc again
+//? change zone to ** pointer to not need allocs.tiny or small here?
+void my_free(void *ptr)
 {
 	// if all blocks are free, then call munmap -> zone->free_space - ZONE_SIZE;
 	// everytime free is called, check if prev is null & is free, if its not 'merge' with the block that is currently being freed
@@ -164,9 +169,11 @@ void myfree(void *ptr)
 		{
 			//! error here
 			printf("Free ERROR: All tiny\n");
+			return;
 		}
 		else
 			printf("Free OK: All tiny\n");
+		allocs.tiny = NULL;
 		// printf("n %d\n", n);
 		// call munmap
 	}
@@ -178,9 +185,11 @@ void myfree(void *ptr)
 		{
 			//! error here
 			printf("Free ERROR: All smoll\n");
+			return;
 		}
 		else
 			printf("Free OK: All smoll\n");
+		allocs.small = NULL;
 	}
 	return;
 }
@@ -363,16 +372,15 @@ int main()
 {
 	#ifdef DEBUG
 	{
-		void *p = malloc(0);
+		void *p = malloc(4095);
 		#ifdef __APPLE__
 		size_t block_size = malloc_size(p);
 		#else
 		size_t block_size = malloc_usable_size(p);
 		#endif
-		size_t alignment_padding = block_size;
 
 		printf("Machine word size: %lu bytes\n", sizeof(void *));
-		printf("Alignment of malloc: %lu bytes\n", alignment_padding);
+		printf("block_size of malloc: %lu bytes\n", block_size);
 
 		free(p);
 		return 0;
@@ -382,9 +390,9 @@ int main()
 	// char *one = my_malloc(size);
 	// char *two = my_malloc(size);
 	// // char *three = my_malloc(241);
-	// myfree(one);
-	// myfree(two);
-	// // myfree(three);
+	// my_free(one);
+	// my_free(two);
+	// // my_free(three);
 	//! try this and let just enough space to add a last free block of size 0 to check if last if is useful
 	if (1)
 	{
@@ -393,18 +401,23 @@ int main()
 		char *arr[allo + 1];
 		for (size_t i = 0; i < allo; i++)
 		{
-			// size = 256;
-			// arr[i] = my_malloc(size);
-			// memset(arr[i], '0', size - 1);
-			// my_free(arr[i]);
-			size = 256;
-			arr[i] = my_malloc(size);
-			// arr[i] = my_malloc(size);
-			memset(arr[i], '0', size - 1);
+			{
+				//! wut?
+				size = 256;
+				arr[i] = my_malloc(size);
+				memset(arr[i], '0', size - 1);
+				my_free(arr[i]);
+			}
+			{
+				// size = 256;
+				// arr[i] = my_malloc(size);
+				// arr[i] = my_malloc(size);
+				// memset(arr[i], '0', size - 1);
+			}
 		}
-		// myfree(arr[allo - 1]);
+		// my_free(arr[allo - 1]);
 		// arr[allo - 1] = my_malloc(size); //! change this to 128 to test line 390
-		arr[allo] = my_malloc(128); //! change this to 128 to test line 390
+		// arr[allo] = my_malloc(128); //! change this to 128 to test line 390
 		// my_malloc(16); //!comment this
 	}
 	printf("page size %d %lu %lu\n", PAGE, TINY_ZONE_SIZE, (TINY_ZONE_SIZE - ZONE_SIZE) / (TINY_SIZE + BLOCK_SIZE));
