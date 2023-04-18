@@ -4,6 +4,7 @@
 #include <unistd.h>
 
 //TODO move defines to another file, and utils, and bonus(?)
+// remember to make Makefile and check with 42 flags
 
 #define BUCKET_SIZE sizeof(t_bucket)
 #define ZONE_SIZE sizeof(t_zone)
@@ -40,7 +41,7 @@ typedef struct s_zone
 } t_zone;
 
 // TODO
-//! for large erase this, and just have them floating aroung with a block, zone is useless as they are just FREE or NOTFREE and cant be reused once freed
+//? for large erase this, and just have them floating aroung with a block, zone is useless as they are just FREE or NOTFREE and cant be reused once freed
 typedef struct s_bucket
 {
 	t_zone *tiny;
@@ -50,21 +51,17 @@ typedef struct s_bucket
 
 t_bucket allocs;
 
+//? kind of useless now?
 void ft_bzero(void *s, size_t n)
 {
 	while (n--)
 	{
-		// ((char *)s)[n] = 125;
-		// printf("%x", ((char *)s)[n]);
 		((char *)s)[n] = '\0';
 	}
 }
 
 // TODO
-// what me gonna do with show_mem_alloc if its 16 each time? -> this is the behavior of normal malloc all good
-// could keep size user gives me and malloc go_next_block anyway?
-// and call get_next each time i need but keep in variable user size
-// if called on max size_t this returns 0 check it out
+// if called on max size_t this returns 0 check it out -> compare to malloc
 size_t go_next_block(size_t size)
 {
 	return (size + 15) & ~15;
@@ -228,6 +225,8 @@ void create_zone_plus_block(t_zone *ptr, size_t size, size_t free_space)
 }
 
 // TODO
+// change name of copy to current_zone 
+//? replace copy for *zone -> not possible need to keep first pointer so rename
 // cut this into smaller funcs
 // rename this func?
 //! in create_block if theres not enough space to create teh last free bock it will segfault add protections somewhere -> test what happens if at the end of the zone theres not enough space for a free block
@@ -251,17 +250,24 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 	//! this could be >= to zero maybe need to test after cleaning -> the last block could work with 0 to zero maybe? need to test!
 	//? rework this part?
 	//! llego al final del block y no queda espacio para hcer el block de free se rompe no?
+	//! aqui esta el error, esto revisa solo el primer zone, si ese esta lleno crea otro, no revisa en copy->next
+	while (copy && copy->next)
+		copy = copy->next;
 	if (copy && copy->free_space >= BLOCK_SIZE + size)
 	{
+		// while (copy->next && copy->free_space <= BLOCK_SIZE + size)
+		// {
+		// 	copy = copy->next;
+		// }
+		// rename to current_block
 		t_block *current = copy->block;
 		while (current)
-		{
+		{	
 			//? current->size >= size + BLOCK_SIZE cos im creating a new block so i need at least BLOCK_SIZE + size of free memory
 			if (current->free == FREE && current->size >= size + BLOCK_SIZE)
-			{
+				{
 				// create block here
 				create_block(current, current->prev, (void *)current + BLOCK_SIZE + size, size, NOTFREE);
-
 				// create free block
 				create_block(current->next, current, NULL, copy->free_space - BLOCK_SIZE - size, FREE);
 
@@ -271,7 +277,7 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 				//! try this and let just enough space to add a last free block of size 0 to check if last if is useful
 				// if (current->next)
 				copy->free_space = current->next->size; //? this is the true one if need to erase
-				printf("curr %zu %zu next %zu %zu %zu\n", current, current->size,current->next, current->next->size, copy->free_space);
+					printf("curr %zu %zu next %zu %zu %zu\n", current, current->size,current->next, current->next->size, copy->free_space);
 				// else
 					// copy->free_space = 0;
 				return ((void *)current + BLOCK_SIZE);
@@ -291,7 +297,7 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 		// else
 			// first = copy->next;
 
-		printf("first %zu\n", size);
+		printf("first %zu ", size);
 		first = mmap(NULL, type_zone_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
 		if (first == MAP_FAILED)
 		{
@@ -299,8 +305,9 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 			return NULL;
 		}
 		//! this only happens if copy != null
-		while (copy && copy->next)
-			copy = copy->next;
+		//? this most likely not needed anymore
+		// while (copy && copy->next)
+		// 	copy = copy->next;
 
 		// copy = copy->next;
 		create_zone_plus_block(first, size, type_zone_size - ZONE_SIZE - BLOCK_SIZE - BLOCK_SIZE - size);
@@ -345,7 +352,6 @@ void *my_malloc(size_t size)
 	return ret;
 }
 
-//! idea : code malloc_usable_size ez af and ez bonus!
 size_t my_malloc_usable_size(void *ptr)
 {
 	t_block *block = (void *)ptr - BLOCK_SIZE;
@@ -368,7 +374,7 @@ void hex_dump(void *s, size_t n)
 	// printf("\n");
 }
 
-int toggleBit(int n, int k)
+int toggleBit(int n, int k) //! useless
 {
 	return (n ^ (1 << (k - 1)));
 }
@@ -452,12 +458,12 @@ int main()
 	}
 	printf("page size %d %lu %lu\n", PAGE, TINY_ZONE_SIZE, (TINY_ZONE_SIZE - ZONE_SIZE) / (TINY_SIZE + BLOCK_SIZE));
 	printf("page size %d %lu %lu\n", PAGE, SMALL_ZONE_SIZE, (SMALL_ZONE_SIZE - ZONE_SIZE) / (SMALL_SIZE + BLOCK_SIZE));
+
 	// ft_bzero(&allocs, sizeof(t_bucket));
 	// toogle byte!
 	// int tst = -2147483648;
 	// printf("max %lu %d\n", tst, (int) tst);
 	// tst ^= (1u << 31);
-
 	// tst ^= (1u << 31);
 	// tst ^= (1u << 30);
 	// tst ^= (1u << 29);
