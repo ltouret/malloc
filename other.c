@@ -311,6 +311,7 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 
 		// copy = copy->next;
 		create_zone_plus_block(first, size, type_zone_size - ZONE_SIZE - BLOCK_SIZE - BLOCK_SIZE - size);
+		//? can i do his better? this if else ugly
 		if (copy == NULL)
 			*zone = first;
 		else
