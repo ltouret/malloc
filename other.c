@@ -393,7 +393,7 @@ void printBits(long num)
 //TODO now
 // free adds BLOCK_SIZE when it shouldnt
 // por ahora acada vez q creo un bloque en una zona existente escribo el bloque de free al lado, que pasa cuando
-// el bloque de al lado ya tiene algo, reescribo esa zona en free aunque esta ocupada x)
+// el bloque de al lado ya tiene algo, reescribo esa zona en free aunque esta ocupada x) cmt
 
 int main()
 {
