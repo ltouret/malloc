@@ -115,8 +115,9 @@ void my_free(void *ptr)
 		printf("Me large and all free\n");
 		return;
 	}
-	metadata->free = 1;
-	zone->free_space += metadata->size + BLOCK_SIZE;
+	metadata->free = FREE;
+	zone->free_space += metadata->size;
+	printf("me free %zu ", zone->free_space);
 	// this is to defrag
 	// en que sentido intento el merge? primero a prev y dps a next?
 	if (metadata->prev && metadata->prev->free)
@@ -132,7 +133,7 @@ void my_free(void *ptr)
 		// metadata->next = ;
 		//  metadata->free = 1;
 		// TODO this is bad
-		// zone->free_space += (BLOCK_SIZE + metadata->size); // does this resta todo o solo parte?
+		zone->free_space += BLOCK_SIZE; // does this resta todo o solo parte?
 		metadata = prev;
 	}
 	// does this die if prev was free? maybe as its not updated with new changes to linked list
@@ -155,10 +156,13 @@ void my_free(void *ptr)
 		// metadata->next
 		// metadata->free = 1;
 		// TODO this is bad
+		zone->free_space += BLOCK_SIZE; // does this resta todo o solo parte?
 		// zone->free_space += (BLOCK_SIZE + next->size); // does this resta todo o solo parte?
 	}
 	// free (munmap) if all blocks in a zone are free
 	// TODO this two if fail free_space + 32 will never be 240 fix WUT?
+	//! now that i changed free_space relation with blocks this two most likely are dead
+	//! if theres no free block at the end this fails too cos free_space + BLOCK_SIZE would be bigger than zone size
 	if (zone->free_space + ZONE_SIZE + BLOCK_SIZE == TINY_ZONE_SIZE)
 	{
 		// add protection if munmap -1?
@@ -176,6 +180,8 @@ void my_free(void *ptr)
 		// printf("n %d\n", n);
 		// call munmap
 	}
+	//! now that i changed free_space relation with blocks this two most likely are dead
+	//! if theres no free block at the end this fails too cos free_space + BLOCK_SIZE would be bigger than zone size
 	else if (zone->free_space + ZONE_SIZE + BLOCK_SIZE == SMALL_ZONE_SIZE)
 	{
 		// call munmap
@@ -251,7 +257,8 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 	//? rework this part?
 	//! llego al final del block y no queda espacio para hcer el block de free se rompe no?
 	//! aqui esta el error, esto revisa solo el primer zone, si ese esta lleno crea otro, no revisa en copy->next
-	while (copy && copy->next)
+	while (copy && copy->free_space < BLOCK_SIZE + size && copy->next)
+	// while (copy && copy->next)
 		copy = copy->next;
 	if (copy && copy->free_space >= BLOCK_SIZE + size)
 	{
@@ -261,6 +268,7 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 		// }
 		// rename to current_block
 		t_block *current = copy->block;
+		// printf("curr %zu %zu next %zu %zu %zu\n", current, current->size,current->next, current->next->size, copy->free_space);
 		while (current)
 		{	
 			//? current->size >= size + BLOCK_SIZE cos im creating a new block so i need at least BLOCK_SIZE + size of free memory
@@ -277,7 +285,7 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 				//! try this and let just enough space to add a last free block of size 0 to check if last if is useful
 				// if (current->next)
 				copy->free_space = current->next->size; //? this is the true one if need to erase
-					printf("curr %zu %zu next %zu %zu %zu\n", current, current->size,current->next, current->next->size, copy->free_space);
+				printf("curr %zu %zu next %zu %zu %zu\n", current, current->size,current->next, current->next->size, copy->free_space);
 				// else
 					// copy->free_space = 0;
 				return ((void *)current + BLOCK_SIZE);
@@ -289,27 +297,13 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 	else
 	{
 		//? allocs.tiny zone isnt null and theres no free_space so we need to create another mmap in allocs.tiny->next = mmap and bzero sizeof(TINY_ZONE_SIZE)
-		// if (copy == NULL)
-		// *zone = copy;
 		t_zone *first = NULL;
-		// if (copy == NULL)
-			// first = NULL;
-		// else
-			// first = copy->next;
-
-		printf("first %zu ", size);
 		first = mmap(NULL, type_zone_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
 		if (first == MAP_FAILED)
 		{
 			printf("Second malloc failed\n");
 			return NULL;
 		}
-		//! this only happens if copy != null
-		//? this most likely not needed anymore
-		// while (copy && copy->next)
-		// 	copy = copy->next;
-
-		// copy = copy->next;
 		create_zone_plus_block(first, size, type_zone_size - ZONE_SIZE - BLOCK_SIZE - BLOCK_SIZE - size);
 		//? can i do his better? this if else ugly
 		if (copy == NULL)
@@ -396,6 +390,11 @@ void printBits(long num)
 #include <malloc.h>
 #endif
 
+//TODO now
+// free adds BLOCK_SIZE when it shouldnt
+// por ahora acada vez q creo un bloque en una zona existente escribo el bloque de free al lado, que pasa cuando
+// el bloque de al lado ya tiene algo, reescribo esa zona en free aunque esta ocupada x)
+
 int main()
 {
 	#ifdef DEBUG
@@ -446,14 +445,17 @@ int main()
 		// my_free(arr[allo - 1]);
 		// arr[allo - 1] = my_malloc(size); //! change this to 128 to test line 390
 		arr[allo] = my_malloc(128); //! change this to 128 to test line 390
-		my_free(arr[allo]);
+		// my_free(arr[allo]);
 		my_free(arr[allo - 1]);
 		arr[allo] = my_malloc(256); //! change this to 128 to test line 390
-		arr[allo] = my_malloc(128); //! change this to 128 to test line 390
-		//!theres a bug here why new zone should add to the new one
-		arr[allo] = my_malloc(128); //! change this to 128 to test line 390
-		arr[allo] = my_malloc(128); //! change this to 128 to test line 390
-		arr[allo] = my_malloc(128); //! change this to 128 to test line 390
+		// arr[allo] = my_malloc(128); //! change this to 128 to test line 390
+		// //!theres a bug here why new zone should add to the new one
+		// arr[allo] = my_malloc(128); //! change this to 128 to test line 390
+		// arr[allo] = my_malloc(128); //! change this to 128 to test line 390
+		// arr[allo] = my_malloc(128); //! change this to 128 to test line 390
+		// // my_free(arr[allo - 3]);
+		// my_free(arr[10]);
+		// my_malloc(256); //! change this to 128 to test line 390
 		// my_malloc(0);
 		// my_malloc(16);
 	}
