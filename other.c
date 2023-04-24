@@ -116,8 +116,9 @@ void my_free(void *ptr)
 		return;
 	}
 	metadata->free = FREE;
+	printf("me free %zu\n", metadata->size);
 	zone->free_space += metadata->size;
-	printf("me free %zu ", zone->free_space);
+	printf("me free %zu\n", zone->free_space);
 	// this is to defrag
 	// en que sentido intento el merge? primero a prev y dps a next?
 	if (metadata->prev && metadata->prev->free)
@@ -135,6 +136,7 @@ void my_free(void *ptr)
 		// TODO this is bad
 		zone->free_space += BLOCK_SIZE; // does this resta todo o solo parte?
 		metadata = prev;
+		printf("free prev\n");
 	}
 	// does this die if prev was free? maybe as its not updated with new changes to linked list
 	if (metadata->next && metadata->next->free)
@@ -157,6 +159,7 @@ void my_free(void *ptr)
 		// metadata->free = 1;
 		// TODO this is bad
 		zone->free_space += BLOCK_SIZE; // does this resta todo o solo parte?
+		printf("free next, %zu %zu\n", zone->free_space, metadata->size);
 		// zone->free_space += (BLOCK_SIZE + next->size); // does this resta todo o solo parte?
 	}
 	// free (munmap) if all blocks in a zone are free
@@ -260,7 +263,9 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 	while (copy && copy->free_space < BLOCK_SIZE + size && copy->next)
 	// while (copy && copy->next)
 		copy = copy->next;
-	if (copy && copy->free_space >= BLOCK_SIZE + size)
+	// if (copy)
+		// printf("%zu %zu %zu\n", copy->free_space, size + BLOCK_SIZE, 0);
+	if (copy && copy->free_space >= size)
 	{
 		// while (copy->next && copy->free_space <= BLOCK_SIZE + size)
 		// {
@@ -272,22 +277,25 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 		while (current)
 		{	
 			//? current->size >= size + BLOCK_SIZE cos im creating a new block so i need at least BLOCK_SIZE + size of free memory
-			if (current->free == FREE && current->size >= size + BLOCK_SIZE)
+			// printf("%zu %zu\n", current->size, size + BLOCK_SIZE);
+			if (current->free == FREE && current->size >= size)
 				{
 				// create block here
 				//! for me this is not the prob its free check there man
-				const char size_flag = current->size == size + BLOCK_SIZE;
+				const char size_flag = current->size >= size + BLOCK_SIZE;
 				create_block(current, current->prev, (void *)current + BLOCK_SIZE + size, size, NOTFREE);
 				// create free block
-				if (!size_flag)
-					create_block(current->next, current, NULL, copy->free_space - BLOCK_SIZE - size, FREE);
-
+				if (size_flag) {
+					copy->free_space -= BLOCK_SIZE; //? this is the true one if need to erase
+					create_block(current->next, current, NULL, copy->free_space - size, FREE);
+				}
 				// update zone free space
 				//! check this could be wrong, or theres a better way to protect if theres no last free block at the end of the zone
 				//? maybe cant go here cos protection of current->size - BLOCK_SIZE means we will never get in part of the code if theres no space to malloc BLOCK_SIZE
 				//! try this and let just enough space to add a last free block of size 0 to check if last if is useful
 				// if (current->next)
-				copy->free_space = current->next->size; //? this is the true one if need to erase
+				// copy->free_space = current->next->size; //? this is the true one if need to erase
+				copy->free_space -= size; //? this is the true one if need to erase
 				printf("curr %zu %zu next %zu %zu %zu\n", current, current->size,current->next, current->next->size, copy->free_space);
 				// else
 					// copy->free_space = 0;
@@ -450,6 +458,9 @@ int main()
 		arr[allo] = my_malloc(128); //! change this to 128 to test line 390
 		// my_free(arr[allo]);
 		my_free(arr[allo - 1]);
+		my_free(arr[allo - 2]);
+		arr[allo] = my_malloc(256); //! change this to 128 to test line 390
+		arr[allo] = my_malloc(256); //! change this to 128 to test line 390
 		arr[allo] = my_malloc(256); //! change this to 128 to test line 390
 		// arr[allo] = my_malloc(128); //! change this to 128 to test line 390
 		// //!theres a bug here why new zone should add to the new one
