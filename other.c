@@ -275,9 +275,12 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 			if (current->free == FREE && current->size >= size + BLOCK_SIZE)
 				{
 				// create block here
+				//! for me this is not the prob its free check there man
+				const char size_flag = current->size == size + BLOCK_SIZE;
 				create_block(current, current->prev, (void *)current + BLOCK_SIZE + size, size, NOTFREE);
 				// create free block
-				create_block(current->next, current, NULL, copy->free_space - BLOCK_SIZE - size, FREE);
+				if (!size_flag)
+					create_block(current->next, current, NULL, copy->free_space - BLOCK_SIZE - size, FREE);
 
 				// update zone free space
 				//! check this could be wrong, or theres a better way to protect if theres no last free block at the end of the zone
