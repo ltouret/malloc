@@ -116,9 +116,8 @@ void my_free(void *ptr)
 		return;
 	}
 	metadata->free = FREE;
-	printf("me free %zu\n", metadata->size);
 	zone->free_space += metadata->size;
-	printf("me free %zu\n", zone->free_space);
+	printf("metadata %zu me free %zu total %zu \n", metadata, metadata->size, zone->free_space);
 	// this is to defrag
 	// en que sentido intento el merge? primero a prev y dps a next?
 	if (metadata->prev && metadata->prev->free)
@@ -136,7 +135,7 @@ void my_free(void *ptr)
 		// TODO this is bad
 		zone->free_space += BLOCK_SIZE; // does this resta todo o solo parte?
 		metadata = prev;
-		printf("free prev\n");
+		// printf("free prev, %zu %zu\n", zone->free_space, metadata->size);
 	}
 	// does this die if prev was free? maybe as its not updated with new changes to linked list
 	if (metadata->next && metadata->next->free)
@@ -159,7 +158,7 @@ void my_free(void *ptr)
 		// metadata->free = 1;
 		// TODO this is bad
 		zone->free_space += BLOCK_SIZE; // does this resta todo o solo parte?
-		printf("free next, %zu %zu\n", zone->free_space, metadata->size);
+		// printf("free next, %zu %zu\n", zone->free_space, metadata->size);
 		// zone->free_space += (BLOCK_SIZE + next->size); // does this resta todo o solo parte?
 	}
 	// free (munmap) if all blocks in a zone are free
@@ -243,17 +242,20 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 	{
 		t_block *current = copy->block;
 		while (current)
-		{	
+		{
+			//! keep 16 ro find another way magic number not good
 			if (current->free == FREE && current->size >= size)
 				{
 				const char size_flag = current->size >= size + BLOCK_SIZE;
+				if (current->size - size < BLOCK_SIZE &&  copy->free_space >= 16 + size)
+					size += 16;
 				create_block(current, current->prev, (void *)current + BLOCK_SIZE + size, size, NOTFREE);
 				if (size_flag) {
 					copy->free_space -= BLOCK_SIZE;
 					create_block(current->next, current, NULL, copy->free_space - size, FREE);
 				}
 				copy->free_space -= size;
-				printf("curr %zu %zu next %zu %zu %zu\n", current, current->size,current->next, current->next->size, copy->free_space);
+				printf("curr %zu %zu next %zu %zu %zu\n", current, current->size, current->next, current->next->size, copy->free_space);
 				return ((void *)current + BLOCK_SIZE);
 			}
 			current = current->next;
@@ -407,15 +409,15 @@ int main()
 			}
 		}
 		arr[allo] = my_malloc(128); //! change this to 128 to test line 390
-		my_free(arr[allo - 2]);
-		my_free(arr[allo - 3]);
-		my_free(arr[allo - 1]);
+		my_free(arr[allo - 2]); // free 256
+		my_free(arr[allo - 3]); // free 256
+		my_free(arr[allo - 1]); // free 256
 		arr[allo] = my_malloc(256); //! change this to 128 to test line 390
 		arr[allo] = my_malloc(256); //! change this to 128 to test line 390
 		arr[allo] = my_malloc(112); //! change this to 128 to test line 390
-		arr[allo] = my_malloc(32); //! change this to 128 to test line 390
-		arr[allo] = my_malloc(32); //! change this to 128 to test line 390
-
+		arr[allo] = my_malloc(16); //! change this to 128 to test line 390
+		arr[allo] = my_malloc(16); //! change this to 128 to test line 390
+		arr[allo] = my_malloc(16); //! change this to 128 to test line 390
 	}
 	printf("page size %d %lu %lu\n", PAGE, TINY_ZONE_SIZE, (TINY_ZONE_SIZE - ZONE_SIZE) / (TINY_SIZE + BLOCK_SIZE));
 	printf("page size %d %lu %lu\n", PAGE, SMALL_ZONE_SIZE, (SMALL_ZONE_SIZE - ZONE_SIZE) / (SMALL_SIZE + BLOCK_SIZE));
