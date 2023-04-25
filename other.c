@@ -202,15 +202,6 @@ void my_free(void *ptr)
 	return;
 }
 
-//! if breaks its cos of this, uncomment and call it in create_zone_plus_block
-// void create_zone(t_zone *ptr, size_t free_space)
-// {
-// 	ptr->next = NULL;
-// 	ptr->block = (void *)ptr + BLOCK_SIZE;
-// 	ptr->free_space = free_space;
-// 	// ptr->type = 0; //! this is useless
-// }
-
 //! in create_block if theres not enough space to create teh last free bock it will segfault add protections somewhere -> test what happens if at the end of the zone theres not enough space for a free block
 void create_block(t_block *ptr, t_block *prev, t_block *next, size_t size, size_t free)
 {
@@ -223,13 +214,10 @@ void create_block(t_block *ptr, t_block *prev, t_block *next, size_t size, size_
 //! in create_block if theres not enough space to create teh last free bock it will segfault add protections somewhere -> test what happens if at the end of the zone theres not enough space for a free block
 void create_zone_plus_block(t_zone *ptr, size_t size, size_t free_space)
 {
-	// create metadata of zone
 	ptr->next = NULL;
 	ptr->block = (void *)ptr + BLOCK_SIZE;
 	ptr->free_space = free_space;
-	// create block of size and return to user;
 	create_block(ptr->block, NULL, (void *)ptr->block + BLOCK_SIZE + size, size, NOTFREE);
-	// create last free block
 	create_block(ptr->block->next, ptr->block, NULL, ptr->free_space, FREE);
 }
 
@@ -243,62 +231,29 @@ void create_zone_plus_block(t_zone *ptr, size_t size, size_t free_space)
 void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 {
 	t_zone *copy = *zone;
-	// if (copy == NULL)
-	// {
-	// 	copy = mmap(NULL, type_zone_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
-	// 	if (copy == MAP_FAILED)
-	// 	{
-	// 		printf("First malloc failed\n");
-	// 		return NULL;
-	// 	}
-	// 	*zone = copy;
-	// 	create_zone_plus_block(copy, size, type_zone_size - ZONE_SIZE - BLOCK_SIZE - BLOCK_SIZE - size);
-	// 	printf("first %zu\n", size);
-	// 	return ((void *)copy->block + BLOCK_SIZE);
-	// }
 	//! this could be >= to zero maybe need to test after cleaning -> the last block could work with 0 to zero maybe? need to test!
 	//? rework this part?
 	//! llego al final del block y no queda espacio para hcer el block de free se rompe no?
 	//! aqui esta el error, esto revisa solo el primer zone, si ese esta lleno crea otro, no revisa en copy->next
-	while (copy && copy->free_space < BLOCK_SIZE + size && copy->next)
-	// while (copy && copy->next)
+	while (copy && copy->free_space < size && copy->next) {
+		// printf("copy %zu %zu ", copy->free_space, BLOCK_SIZE + size);
 		copy = copy->next;
-	// if (copy)
-		// printf("%zu %zu %zu\n", copy->free_space, size + BLOCK_SIZE, 0);
+	}
 	if (copy && copy->free_space >= size)
 	{
-		// while (copy->next && copy->free_space <= BLOCK_SIZE + size)
-		// {
-		// 	copy = copy->next;
-		// }
-		// rename to current_block
 		t_block *current = copy->block;
-		// printf("curr %zu %zu next %zu %zu %zu\n", current, current->size,current->next, current->next->size, copy->free_space);
 		while (current)
 		{	
-			//? current->size >= size + BLOCK_SIZE cos im creating a new block so i need at least BLOCK_SIZE + size of free memory
-			// printf("%zu %zu\n", current->size, size + BLOCK_SIZE);
 			if (current->free == FREE && current->size >= size)
 				{
-				// create block here
-				//! for me this is not the prob its free check there man
 				const char size_flag = current->size >= size + BLOCK_SIZE;
 				create_block(current, current->prev, (void *)current + BLOCK_SIZE + size, size, NOTFREE);
-				// create free block
 				if (size_flag) {
-					copy->free_space -= BLOCK_SIZE; //? this is the true one if need to erase
+					copy->free_space -= BLOCK_SIZE;
 					create_block(current->next, current, NULL, copy->free_space - size, FREE);
 				}
-				// update zone free space
-				//! check this could be wrong, or theres a better way to protect if theres no last free block at the end of the zone
-				//? maybe cant go here cos protection of current->size - BLOCK_SIZE means we will never get in part of the code if theres no space to malloc BLOCK_SIZE
-				//! try this and let just enough space to add a last free block of size 0 to check if last if is useful
-				// if (current->next)
-				// copy->free_space = current->next->size; //? this is the true one if need to erase
-				copy->free_space -= size; //? this is the true one if need to erase
+				copy->free_space -= size;
 				printf("curr %zu %zu next %zu %zu %zu\n", current, current->size,current->next, current->next->size, copy->free_space);
-				// else
-					// copy->free_space = 0;
 				return ((void *)current + BLOCK_SIZE);
 			}
 			current = current->next;
@@ -307,7 +262,6 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 	}
 	else
 	{
-		//? allocs.tiny zone isnt null and theres no free_space so we need to create another mmap in allocs.tiny->next = mmap and bzero sizeof(TINY_ZONE_SIZE)
 		t_zone *first = NULL;
 		first = mmap(NULL, type_zone_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
 		if (first == MAP_FAILED)
@@ -316,7 +270,6 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 			return NULL;
 		}
 		create_zone_plus_block(first, size, type_zone_size - ZONE_SIZE - BLOCK_SIZE - BLOCK_SIZE - size);
-		//? can i do his better? this if else ugly
 		if (copy == NULL)
 			*zone = first;
 		else
@@ -339,15 +292,15 @@ void *my_malloc(size_t size)
 	printf("size %zu: ", size);
 	if (size <= TINY_SIZE)
 	{
-		const size_t type_zone_size = TINY_ZONE_SIZE; //! erase me later when erase printf
+		// const size_t type_zone_size = TINY_ZONE_SIZE; //! erase me later when erase printf
 		// printf("me tiny %lu %d\n", allocs.tiny, size, type_zone_size);
-		ret = create_tiny_small(&allocs.tiny, size, type_zone_size); // check if tiny doesnt exist if it does check tehres space if there is use this
+		ret = create_tiny_small(&allocs.tiny, size, TINY_ZONE_SIZE); // check if tiny doesnt exist if it does check tehres space if there is use this
 	}
 	else if (size <= SMALL_SIZE)
 	{
-		const size_t type_zone_size = SMALL_ZONE_SIZE; //! erase me later when erase printf
+		// const size_t type_zone_size = SMALL_ZONE_SIZE; //! erase me later when erase printf
 		// printf("me smoll %lu %d\n", allocs.small, size, type_zone_size);
-		ret = create_tiny_small(&allocs.small, size, type_zone_size); // check if tiny doesnt exist if it does check tehres space if there is use this
+		ret = create_tiny_small(&allocs.small, size, SMALL_ZONE_SIZE); // check if tiny doesnt exist if it does check tehres space if there is use this
 	}
 	else
 	{
@@ -453,25 +406,16 @@ int main()
 				// memset(arr[i], '0', size - 1);
 			}
 		}
-		// my_free(arr[allo - 1]);
-		// arr[allo - 1] = my_malloc(size); //! change this to 128 to test line 390
 		arr[allo] = my_malloc(128); //! change this to 128 to test line 390
-		// my_free(arr[allo]);
-		my_free(arr[allo - 1]);
 		my_free(arr[allo - 2]);
+		my_free(arr[allo - 3]);
+		my_free(arr[allo - 1]);
 		arr[allo] = my_malloc(256); //! change this to 128 to test line 390
 		arr[allo] = my_malloc(256); //! change this to 128 to test line 390
-		arr[allo] = my_malloc(256); //! change this to 128 to test line 390
-		// arr[allo] = my_malloc(128); //! change this to 128 to test line 390
-		// //!theres a bug here why new zone should add to the new one
-		// arr[allo] = my_malloc(128); //! change this to 128 to test line 390
-		// arr[allo] = my_malloc(128); //! change this to 128 to test line 390
-		// arr[allo] = my_malloc(128); //! change this to 128 to test line 390
-		// // my_free(arr[allo - 3]);
-		// my_free(arr[10]);
-		// my_malloc(256); //! change this to 128 to test line 390
-		// my_malloc(0);
-		// my_malloc(16);
+		arr[allo] = my_malloc(112); //! change this to 128 to test line 390
+		arr[allo] = my_malloc(32); //! change this to 128 to test line 390
+		arr[allo] = my_malloc(32); //! change this to 128 to test line 390
+
 	}
 	printf("page size %d %lu %lu\n", PAGE, TINY_ZONE_SIZE, (TINY_ZONE_SIZE - ZONE_SIZE) / (TINY_SIZE + BLOCK_SIZE));
 	printf("page size %d %lu %lu\n", PAGE, SMALL_ZONE_SIZE, (SMALL_ZONE_SIZE - ZONE_SIZE) / (SMALL_SIZE + BLOCK_SIZE));
