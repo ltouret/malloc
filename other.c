@@ -315,6 +315,8 @@ void *my_malloc(size_t size)
 
 size_t my_malloc_usable_size(void *ptr)
 {
+	if (!ptr)
+		return 0;
 	t_block *block = (void *)ptr - BLOCK_SIZE;
 	// printf("%zu\n", block->size);
 	return (block->size);
