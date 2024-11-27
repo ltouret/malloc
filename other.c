@@ -1,15 +1,16 @@
 #include <stdio.h>
+#include <sys/resource.h>
 #include <stdlib.h>
 #include <sys/mman.h>
 #include <unistd.h>
 
-//TODO move defines to another file, and utils, and bonus(?)
-// remember to make Makefile and check with 42 flags
+// TODO move defines to another file, and utils, and bonus(?)
+//  remember to make Makefile and check with 42 flags
 
 #define BUCKET_SIZE sizeof(t_bucket)
 #define ZONE_SIZE sizeof(t_zone)
 #define BLOCK_SIZE sizeof(t_block)
-#define PAGE getpagesize()
+#define PAGE sysconf(_SC_PAGESIZE)
 
 #define TINY_SIZE 256
 #define SMALL_SIZE 4096 // should be more
@@ -68,10 +69,10 @@ size_t go_next_block(size_t size)
 }
 
 /*
-	// create func that iterates through the zones and prints info about every zone, and block.
+	create func that iterates through the zones and prints info about every zone, and block.
 */
 
-//TODO
+// TODO
 //! forgot to change allocs.tiny, small or large to null if all is freed so this does segfault if i free all and try to use my_malloc again
 //? change zone to ** pointer to not need allocs.tiny or small here?
 void my_free(void *ptr)
@@ -158,8 +159,8 @@ void my_free(void *ptr)
 		// metadata->free = 1;
 		// TODO this is bad
 		zone->free_space += BLOCK_SIZE; // does this resta todo o solo parte?
-		// printf("free next, %zu %zu\n", zone->free_space, metadata->size);
-		// zone->free_space += (BLOCK_SIZE + next->size); // does this resta todo o solo parte?
+										// printf("free next, %zu %zu\n", zone->free_space, metadata->size);
+										// zone->free_space += (BLOCK_SIZE + next->size); // does this resta todo o solo parte?
 	}
 	// free (munmap) if all blocks in a zone are free
 	// TODO this two if fail free_space + 32 will never be 240 fix WUT?
@@ -221,7 +222,7 @@ void create_zone_plus_block(t_zone *ptr, size_t size, size_t free_space)
 }
 
 // TODO
-// change name of copy to current_zone 
+// change name of copy to current_zone
 //? replace copy for *zone -> not possible need to keep first pointer so rename
 // cut this into smaller funcs
 // rename this func?
@@ -234,7 +235,8 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 	//? rework this part?
 	//! llego al final del block y no queda espacio para hcer el block de free se rompe no?
 	//! aqui esta el error, esto revisa solo el primer zone, si ese esta lleno crea otro, no revisa en copy->next
-	while (copy && copy->free_space < size && copy->next) {
+	while (copy && copy->free_space < size && copy->next)
+	{
 		// printf("copy %zu %zu ", copy->free_space, BLOCK_SIZE + size);
 		copy = copy->next;
 	}
@@ -245,12 +247,13 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 		{
 			//! keep 16 ro find another way magic number not good
 			if (current->free == FREE && current->size >= size)
-				{
+			{
 				const char size_flag = current->size >= size + BLOCK_SIZE;
-				if (current->size - size < BLOCK_SIZE &&  copy->free_space >= 16 + size)
+				if (current->size - size < BLOCK_SIZE && copy->free_space >= 16 + size)
 					size += 16;
 				create_block(current, current->prev, (void *)current + BLOCK_SIZE + size, size, NOTFREE);
-				if (size_flag) {
+				if (size_flag)
+				{
 					copy->free_space -= BLOCK_SIZE;
 					create_block(current->next, current, NULL, copy->free_space - size, FREE);
 				}
@@ -281,14 +284,14 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 	}
 }
 
-//TODO
+// TODO
 //! if malloc size < 0 malloc returns a ptr address 0 -> its undefined behavior so idc
 //! if malloc size == 0 malloc returns a ptr size 16 in m1 and 24 on ocean -> so create a allocs.tiny zone of 16
 void *my_malloc(size_t size)
 {
 	void *ret = NULL;
 
-	if (size == 0)
+	if (size == 0) //! is this necessary, does malloc do this check?
 		size++;
 	size = go_next_block(size); //! check what to do if max size_t
 	printf("size %zu: ", size);
@@ -358,21 +361,35 @@ void printBits(long num)
 #include <malloc.h>
 #endif
 
-//TODO now
-// free adds BLOCK_SIZE when it shouldnt
-// por ahora acada vez q creo un bloque en una zona existente escribo el bloque de free al lado, que pasa cuando
-// el bloque de al lado ya tiene algo, reescribo esa zona en free aunque esta ocupada x) cmt
+// TODO now
+//  free adds BLOCK_SIZE when it shouldnt
+//  por ahora acada vez q creo un bloque en una zona existente escribo el bloque de free al lado, que pasa cuando
+//  el bloque de al lado ya tiene algo, reescribo esa zona en free aunque esta ocupada x) cmt
 
 int main()
 {
-	#ifdef DEBUG
+
+	struct rlimit old_lim, lim, new_lim;
+	printf("page_size %d\n", sysconf(_SC_PAGESIZE));
+	// Get old limits
+	if (getrlimit(RLIMIT_AS, &old_lim) == 0)
+		printf("Old limits -> soft limit= %ld \t"
+			   " hard limit= %ld \n",
+			   old_lim.rlim_cur,
+			   old_lim.rlim_max);
+	if (getrlimit(RLIMIT_DATA, &old_lim) == 0)
+		printf("Old limits -> soft limit= %ld \t"
+			   " hard limit= %ld \n",
+			   old_lim.rlim_cur,
+			   old_lim.rlim_max);
+#ifdef DEBUG
 	{
 		void *p = malloc(4095);
-		#ifdef __APPLE__
+#ifdef __APPLE__
 		size_t block_size = malloc_size(p);
-		#else
+#else
 		size_t block_size = malloc_usable_size(p);
-		#endif
+#endif
 
 		printf("Machine word size: %lu bytes\n", sizeof(void *));
 		printf("block_size of malloc: %lu bytes\n", block_size);
@@ -380,7 +397,7 @@ int main()
 		free(p);
 		return 0;
 	}
-	#endif
+#endif
 	// size_t size = 5;
 	// char *one = my_malloc(size);
 	// char *two = my_malloc(size);
@@ -411,15 +428,15 @@ int main()
 			}
 		}
 		arr[allo] = my_malloc(128); //! change this to 128 to test line 390
-		my_free(arr[allo - 2]); // free 256
-		my_free(arr[allo - 3]); // free 256
-		my_free(arr[allo - 1]); // free 256
+		my_free(arr[allo - 2]);		// free 256
+		my_free(arr[allo - 3]);		// free 256
+		my_free(arr[allo - 1]);		// free 256
 		arr[allo] = my_malloc(256); //! change this to 128 to test line 390
 		arr[allo] = my_malloc(256); //! change this to 128 to test line 390
 		arr[allo] = my_malloc(112); //! change this to 128 to test line 390
-		arr[allo] = my_malloc(16); //! change this to 128 to test line 390
-		arr[allo] = my_malloc(16); //! change this to 128 to test line 390
-		arr[allo] = my_malloc(16); //! change this to 128 to test line 390
+		arr[allo] = my_malloc(16);	//! change this to 128 to test line 390
+		arr[allo] = my_malloc(16);	//! change this to 128 to test line 390
+		arr[allo] = my_malloc(16);	//! change this to 128 to test line 390
 	}
 	printf("page size %d %lu %lu\n", PAGE, TINY_ZONE_SIZE, (TINY_ZONE_SIZE - ZONE_SIZE) / (TINY_SIZE + BLOCK_SIZE));
 	printf("page size %d %lu %lu\n", PAGE, SMALL_ZONE_SIZE, (SMALL_ZONE_SIZE - ZONE_SIZE) / (SMALL_SIZE + BLOCK_SIZE));
