@@ -2,6 +2,7 @@
 #include <sys/resource.h>
 #include <stdlib.h>
 #include <sys/mman.h>
+#include <stdbool.h>
 #include <unistd.h>
 
 // TODO move defines to another file, and utils, and bonus(?)
@@ -87,18 +88,12 @@ void *create_zone(size_t type_zone_size)
 	t_zone *zone = mmap(NULL, type_zone_size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0); //! -1 here bc of MAP_ANONYMOUS
 	if (zone == MAP_FAILED)
 	{
-		printf("Second malloc failed\n");
+		printf("create_zone failed, zone size %ld\n", type_zone_size);
 		return NULL;
 	}
 	zone->next = NULL;
 	zone->block = (void *)zone + BLOCK_SIZE;
-	zone->free_space = 0; //! change me to real data
-
-	//! do just one of these and create a ugly init function
-	zone->next = NULL;
-	zone->block = (void *)zone + BLOCK_SIZE;
-	zone->free_space = 0; //! change me to real data
-
+	zone->free_space = type_zone_size - ZONE_SIZE; //! change me to real data
 	return zone;
 
 	// create_block(ptr->block, NULL, (void *)ptr->block + BLOCK_SIZE + size, size, NOTFREE);
@@ -106,7 +101,7 @@ void *create_zone(size_t type_zone_size)
 }
 
 // TODO
-// malloc 3 tiny, 2 small at the start of the program?
+// malloc 2 tiny, 2 small at the start of the program?
 void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 {
 	/*
@@ -139,6 +134,32 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 	}
 }
 
+//! or return memory address
+void *init()
+{
+	t_zone *tiny = create_zone(TINY_ZONE_SIZE * 2);
+	tiny->free_space = TINY_ZONE_SIZE - ZONE_SIZE;
+
+	t_zone *next = tiny->next;
+	next = (void *)tiny + TINY_ZONE_SIZE;
+	next->free_space = TINY_ZONE_SIZE - ZONE_SIZE;
+
+	allocs.tiny = tiny;
+	printf("pre malloc with tiny 1 %ld size %ld\n", allocs.tiny, allocs.tiny->free_space);
+	printf("pre malloc with tiny 2 %ld size %ld\n", allocs.tiny->next, allocs.tiny->next->free_space);
+
+	// t_zone *small = mmap(NULL, SMALL_ZONE_SIZE * 2, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0); //! -1 here bc of MAP_ANONYMOUS
+	// if (tiny == MAP_FAILED)
+	// return NULL;
+	// small->next = NULL;
+	// small->block = (void *)small + BLOCK_SIZE;
+	// small->free_space = 0; //! change me to real data
+	// allocs.small = small;
+
+	// printf("pre malloc with tiny %ld, small %ld\n", allocs.tiny, allocs.small);
+	return tiny;
+}
+
 // TODO
 //! create large needs to be a multiple of page_size too!
 //! if malloc size < 0 malloc returns a ptr address 0 -> its undefined behavior so idc
@@ -148,23 +169,26 @@ void *my_malloc(size_t size)
 {
 	void *ret = NULL;
 
+	//! or this?
+	if (!size)
+		return NULL;
+	if (init() == false)
+		return NULL;
 	// if (size == 0) //! is this necessary, does malloc do this check? its diff on each fucking pc wtf
 	// size++;
-	if (!size)
-		return NULL;			//! or this?
 	size = go_next_block(size); //! check what to do if max size_t
 	printf("size %zu: ", size);
 	if (size <= TINY_SIZE)
 	{
 		// const size_t type_zone_size = TINY_ZONE_SIZE; //! erase me later when erase printf
 		// printf("me tiny %lu %d\n", allocs.tiny, size, type_zone_size);
-		ret = create_tiny_small(&allocs.tiny, size, TINY_ZONE_SIZE * 2); // check if tiny doesnt exist if it does check tehres space if there is use this
+		ret = create_tiny_small(&allocs.tiny, size, TINY_ZONE_SIZE); // check if tiny doesnt exist if it does check tehres space if there is use this
 	}
 	else if (size <= SMALL_SIZE)
 	{
 		// const size_t type_zone_size = SMALL_ZONE_SIZE; //! erase me later when erase printf
 		// printf("me smoll %lu %d\n", allocs.small, size, type_zone_size);
-		ret = create_tiny_small(&allocs.small, size, SMALL_ZONE_SIZE * 2); // check if tiny doesnt exist if it does check tehres space if there is use this
+		ret = create_tiny_small(&allocs.small, size, SMALL_ZONE_SIZE); // check if tiny doesnt exist if it does check tehres space if there is use this
 	}
 	else
 	{
