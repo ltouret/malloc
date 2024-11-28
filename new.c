@@ -93,7 +93,7 @@ void *create_zone(size_t type_zone_size)
 		return NULL;
 	}
 	zone->next = NULL;
-	zone->block = NULL; //! block to null seems a better idea, will test now, reverse if fails
+	zone->block = NULL;							   //! block to null seems a better idea, will test now, reverse if fails
 	zone->free_space = type_zone_size - ZONE_SIZE; //! change me to real data
 	return zone;
 }
@@ -146,14 +146,39 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 		//! most likely not need two of them, head or curr
 		if (!head)
 		{
+			//? clean this
 			t_block *ptr = create_block((void *)current + ZONE_SIZE, NULL, NULL, size + BLOCK_SIZE, NOTFREE);
 			current->block = ptr;
 			// current->block = (void *)current + ZONE_SIZE;
 			current->free_space -= size + BLOCK_SIZE;
-			//! test this print here
+			//! test this with print here
 			printf("found enough space in zone %ld free space %ld\n", current, current->free_space);
 			return (void *)ptr + BLOCK_SIZE;
 		}
+		// addd here now the while loop to find the next free zone or null
+		//? what happens if the last block is free and i want to write the data there, it wont go into the loop so could fail, edge case!!!
+		while (curr_block->next)
+		{
+			//? maybe can add this condition in the loop directly
+			if (curr_block->free == FREE)
+				break;
+			curr_block = curr_block->next;
+		}
+		// else block exists and is free
+		//! test this shit a fuckton
+		if (curr_block->free == FREE) {
+			//? create update block?
+			t_block *ptr = create_block(curr_block, curr_block->prev, curr_block->next, size, NOTFREE);
+			//! this shit fails hardcore, if the block was using 100 and now i use 40, and i change free_space to reflect this then
+			//! it will seem like i have more free than i actually have as i lost 60 in the fragmentation!!!
+			//! if i dont update free_space then it will show as if i have less memory i actually have, but its the only way with memory fragmentation
+			//! so if not bonus then i cant update free_space here
+			return (void *)ptr + BLOCK_SIZE;
+		} else {
+
+		}
+		// if new block
+		return NULL; //? catch all
 	}
 }
 
