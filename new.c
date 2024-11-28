@@ -73,12 +73,13 @@ void my_free(void *ptr)
 {
 }
 
-void create_block(t_block *ptr, t_block *prev, t_block *next, size_t size, size_t free)
+t_block *create_block(t_block *ptr, t_block *prev, t_block *next, size_t size, size_t free)
 {
 	ptr->prev = prev;
 	ptr->next = next;
 	ptr->size = size;
 	ptr->free = free;
+	return ptr;
 }
 
 //! OLD BUG -> in create_block if theres not enough space to create teh last free bock it will segfault add protections somewhere -> test what happens if at the end of the zone theres not enough space for a free block
@@ -92,12 +93,9 @@ void *create_zone(size_t type_zone_size)
 		return NULL;
 	}
 	zone->next = NULL;
-	zone->block = (void *)zone + BLOCK_SIZE;
+	zone->block = NULL; //! block to null seems a better idea, will test now, reverse if fails
 	zone->free_space = type_zone_size - ZONE_SIZE; //! change me to real data
 	return zone;
-
-	// create_block(ptr->block, NULL, (void *)ptr->block + BLOCK_SIZE + size, size, NOTFREE);
-	// create_block(ptr->block->next, ptr->block, NULL, ptr->free_space, FREE);  //! dont add the new block with the free zone
 }
 
 // TODO
@@ -109,18 +107,23 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 	1 -> found a zone where there is enough, add data
 	2 -> no zone has enough space, create zone, add data
 	*/
+	//! change var name to current zone	7	7
 	t_zone *current = *zone;
 
-	//! this while loop can be done better ti think its 2 am
+	//! this while loop can be done better ti think its 2 am -> do i keep >= or keep it safe but ugly with > as with >= maybe i get out of space
+	//! move this to its own function
 	while (current && size + BLOCK_SIZE >= current->free_space)
 	{
-		//! should be erased
+		// ! should be erased
 		// if (size + BLOCK_SIZE < current->free_space)
 		// {
+		// printf("found enough space in zone %ld free space %ld\n", current, current->free_space);
 		// break;
 		// }
 		current = current->next;
 	}
+	// printf("found enough space in zone %ld free space %ld\n", current, current->free_space);
+	//! case 2 -> no zone has enough space, create zone, add data
 	if (!current)
 	{
 		// t_zone *first = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0); //! -1 here bc of MAP_ANONYMOUS
@@ -132,31 +135,56 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 		current = create_zone(type_zone_size);
 		// create_zone_plus_block(current, type_zone_size - ZONE_SIZE);
 	}
+	//! case 1 -> !found a zone where there is enough, add data
+	else if (current && size + BLOCK_SIZE <= current->free_space) //! the second condition is overkill as it used in the while to get the current free zone
+	{
+		printf("found enough space in zone %ld free space %ld\n", current, current->free_space);
+
+		//! what do i do if its the first block of the zone, example zone was created by init, theres no block info in
+
+		t_block *head = current->block, *curr_block = current->block;
+		//! most likely not need two of them, head or curr
+		if (!head)
+		{
+			t_block *ptr = create_block((void *)current + ZONE_SIZE, NULL, NULL, size + BLOCK_SIZE, NOTFREE);
+			current->block = ptr;
+			// current->block = (void *)current + ZONE_SIZE;
+			current->free_space -= size + BLOCK_SIZE;
+			//! test this print here
+			printf("found enough space in zone %ld free space %ld\n", current, current->free_space);
+			return (void *)ptr + BLOCK_SIZE;
+		}
+	}
 }
 
 //! or return memory address
 void *init()
 {
-	t_zone *tiny = create_zone(TINY_ZONE_SIZE * 2);
-	tiny->free_space = TINY_ZONE_SIZE - ZONE_SIZE;
-
-	t_zone *next = tiny->next;
-	next = (void *)tiny + TINY_ZONE_SIZE;
-	next->free_space = TINY_ZONE_SIZE - ZONE_SIZE;
+	t_zone *tiny = create_zone(TINY_ZONE_SIZE);
+	t_zone *tiny2 = create_zone(TINY_ZONE_SIZE);
+	if (tiny == MAP_FAILED || tiny2 == MAP_FAILED)
+	{
+		printf("init failed, zone size %ld\n", TINY_ZONE_SIZE);
+		return NULL;
+	}
 
 	allocs.tiny = tiny;
+	allocs.tiny->next = tiny2;
 	printf("pre malloc with tiny 1 %ld size %ld\n", allocs.tiny, allocs.tiny->free_space);
 	printf("pre malloc with tiny 2 %ld size %ld\n", allocs.tiny->next, allocs.tiny->next->free_space);
 
-	// t_zone *small = mmap(NULL, SMALL_ZONE_SIZE * 2, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0); //! -1 here bc of MAP_ANONYMOUS
-	// if (tiny == MAP_FAILED)
-	// return NULL;
-	// small->next = NULL;
-	// small->block = (void *)small + BLOCK_SIZE;
-	// small->free_space = 0; //! change me to real data
-	// allocs.small = small;
+	t_zone *small = create_zone(SMALL_ZONE_SIZE);
+	t_zone *small2 = create_zone(SMALL_ZONE_SIZE);
+	if (small == MAP_FAILED || small2 == MAP_FAILED)
+	{
+		printf("init failed, zone size %ld\n", SMALL_ZONE_SIZE);
+		return NULL;
+	}
 
-	// printf("pre malloc with tiny %ld, small %ld\n", allocs.tiny, allocs.small);
+	allocs.small = small;
+	allocs.small->next = small2;
+	printf("pre malloc with small 1 %ld size %ld\n", allocs.small, allocs.small->free_space);
+	printf("pre malloc with small 2 %ld size %ld\n", allocs.small->next, allocs.small->next->free_space);
 	return tiny;
 }
 
@@ -177,7 +205,7 @@ void *my_malloc(size_t size)
 	// if (size == 0) //! is this necessary, does malloc do this check? its diff on each fucking pc wtf
 	// size++;
 	size = go_next_block(size); //! check what to do if max size_t
-	printf("size %zu: ", size);
+	printf("asked malloc of size %zu: \n", size);
 	if (size <= TINY_SIZE)
 	{
 		// const size_t type_zone_size = TINY_ZONE_SIZE; //! erase me later when erase printf
