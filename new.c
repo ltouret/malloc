@@ -51,6 +51,7 @@ typedef struct s_zone
 //? for large erase this, and just have them floating aroung with a block, zone is useless as they are just FREE or NOTFREE and cant be reused once freed
 typedef struct s_bucket
 {
+	t_zone *zone;
 	t_zone *tiny;
 	t_zone *small;
 	// t_zone *large; //! this should be something else as large dont have a special "zone", they dont have block (as their blocks dont have next / prev / free) nor free space or type?
@@ -132,6 +133,22 @@ void *create_zone(size_t type_zone_size)
 	zone->block = NULL;							   //! block to null seems a better idea, will test now, reverse if fails
 	zone->free_space = type_zone_size - ZONE_SIZE; //! change me to real data
 	return zone;
+}
+
+void add_zone(t_zone *zone)
+{
+	t_zone *current = allocs.zone;
+
+	if (!current)
+	{
+		allocs.zone = zone;
+		return ;
+	}
+	while (current->next)
+	{
+		current = current->next; 
+	}
+	current->next = zone;
 }
 
 // TODO
@@ -240,6 +257,7 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 
 //! create function that prints block data, and another that prints zone data.
 
+// TODO
 //! or return memory address
 //? theres a better way to do this
 //! add protection to be called only once i forgot about that l000l
@@ -312,7 +330,7 @@ void *my_malloc(size_t size)
 	{
 		// ????
 		//! Write a function to allocate large zones.
-		printf("me large %d\n", size);
+		printf("me large %ld\n", size);
 	}
 	return ret;
 }
