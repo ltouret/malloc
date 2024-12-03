@@ -107,12 +107,12 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 	1 -> found a zone where there is enough, add data
 	2 -> no zone has enough space, create zone, add data
 	*/
-	//! change var name to current zone	7	7
+	//! change var name to curr_zone
 	t_zone *current = *zone;
 
 	//! this while loop can be done better ti think its 2 am -> do i keep >= or keep it safe but ugly with > as with >= maybe i get out of space
 	//! move this to its own function
-	while (current && size + BLOCK_SIZE >= current->free_space)
+	while (current && size + BLOCK_SIZE > current->free_space)
 	{
 		// ! should be erased
 		// if (size + BLOCK_SIZE < current->free_space)
@@ -124,6 +124,7 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 	}
 	// printf("found enough space in zone %ld free space %ld\n", current, current->free_space);
 	//! case 2 -> no zone has enough space, create zone, add data
+	//? code the add data here for now doesnt!
 	if (!current)
 	{
 		// t_zone *first = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0); //! -1 here bc of MAP_ANONYMOUS
@@ -140,22 +141,24 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 	{
 		printf("found enough space in zone %ld free space %ld\n", current, current->free_space);
 
-		//! what do i do if its the first block of the zone, example zone was created by init, theres no block info in
+		//! what do i do if its the first block of the zone, example zone was created by init, theres no block info in ****
 
-		t_block *head = current->block, *curr_block = current->block;
 		//! most likely not need two of them, head or curr
+		t_block *head = current->block, *curr_block = current->block;
+
+		// first block in zone
 		if (!head)
 		{
 			//? clean this
-			t_block *ptr = create_block((void *)current + ZONE_SIZE, NULL, NULL, size + BLOCK_SIZE, NOTFREE);
+			t_block *ptr = create_block((void *)current + ZONE_SIZE, NULL, NULL, size, NOTFREE);
 			current->block = ptr;
 			// current->block = (void *)current + ZONE_SIZE;
 			current->free_space -= size + BLOCK_SIZE;
 			//! test this with print here
-			printf("found enough space in zone %ld free space %ld\n", current, current->free_space);
+			printf("first head malloc found enough space in zone %ld free space %ld\n", current, current->free_space);
 			return (void *)ptr + BLOCK_SIZE;
 		}
-		// addd here now the while loop to find the next free zone or null
+		// add here now the while loop to find the next free zone or null
 		//? what happens if the last block is free and i want to write the data there, it wont go into the loop so could fail, edge case!!!
 		while (curr_block->next)
 		{
@@ -166,50 +169,70 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 		}
 		// else block exists and is free
 		//! test this shit a fuckton
-		if (curr_block->free == FREE) {
+		if (curr_block->free == FREE)
+		{
 			//? create update block?
 			t_block *ptr = create_block(curr_block, curr_block->prev, curr_block->next, size, NOTFREE);
+			curr_block->next = ptr;
+			printf("if free block malloc found enough space in zone %ld free space %ld\n", current, current->free_space);
 			//! this shit fails hardcore, if the block was using 100 and now i use 40, and i change free_space to reflect this then
 			//! it will seem like i have more free than i actually have as i lost 60 in the fragmentation!!!
 			//! if i dont update free_space then it will show as if i have less memory i actually have, but its the only way with memory fragmentation
 			//! so if not bonus then i cant update free_space here
 			return (void *)ptr + BLOCK_SIZE;
-		} else {
-
 		}
-		// if new block
+		else
+		{
+			// if new block?
+			//! create new block
+			//? problem with new block prev
+			t_block *ptr = create_block((void *)curr_block + size + BLOCK_SIZE, curr_block, NULL, size, NOTFREE);
+			curr_block->next = ptr;
+			current->free_space -= (size + BLOCK_SIZE);
+			printf("new block malloc found enough space in zone %ld free space %ld\n", ptr->prev, current->free_space);
+			return (void *)ptr + BLOCK_SIZE;
+		}
 		return NULL; //? catch all
 	}
 }
 
+//! create function that prints block data, and another that prints zone data.
+
 //! or return memory address
+//? theres a better way to do this
+//! add protection to be called only once i forgot about that l000l
 void *init()
 {
+	// code this better
+	if (allocs.tiny)
+	{
+		return allocs.tiny;
+	}
 	t_zone *tiny = create_zone(TINY_ZONE_SIZE);
 	t_zone *tiny2 = create_zone(TINY_ZONE_SIZE);
 	if (tiny == MAP_FAILED || tiny2 == MAP_FAILED)
 	{
-		printf("init failed, zone size %ld\n", TINY_ZONE_SIZE);
+		printf("tiny init failed, zone size %ld\n", TINY_ZONE_SIZE);
 		return NULL;
 	}
 
 	allocs.tiny = tiny;
 	allocs.tiny->next = tiny2;
-	printf("pre malloc with tiny 1 %ld size %ld\n", allocs.tiny, allocs.tiny->free_space);
-	printf("pre malloc with tiny 2 %ld size %ld\n", allocs.tiny->next, allocs.tiny->next->free_space);
+	// printf("pre malloc with tiny 1 %ld size %ld\n", allocs.tiny, allocs.tiny->free_space);
+	// printf("pre malloc with tiny 2 %ld size %ld\n", allocs.tiny->next, allocs.tiny->next->free_space);
 
 	t_zone *small = create_zone(SMALL_ZONE_SIZE);
 	t_zone *small2 = create_zone(SMALL_ZONE_SIZE);
 	if (small == MAP_FAILED || small2 == MAP_FAILED)
 	{
-		printf("init failed, zone size %ld\n", SMALL_ZONE_SIZE);
+		printf("small init failed, zone size %ld\n", SMALL_ZONE_SIZE);
 		return NULL;
 	}
 
 	allocs.small = small;
 	allocs.small->next = small2;
-	printf("pre malloc with small 1 %ld size %ld\n", allocs.small, allocs.small->free_space);
-	printf("pre malloc with small 2 %ld size %ld\n", allocs.small->next, allocs.small->next->free_space);
+	// printf("pre malloc with small 1 %ld size %ld\n", allocs.small, allocs.small->free_space);
+	// printf("pre malloc with small 2 %ld size %ld\n", allocs.small->next, allocs.small->next->free_space);
 	return tiny;
 }
 
@@ -261,6 +284,21 @@ int main()
 {
 	printf("tiny %d small %d \n", TINY_ZONE_SIZE, SMALL_ZONE_SIZE);
 	my_malloc(10);
+	my_malloc(10);
+	my_malloc(10);
+	//! with this i can use all the free_space of a zone! should be used for testing with free later.
+	if (0)
+	{
+		my_malloc(10);
+		for (size_t i = 0; i < 113; i++)
+		{
+			my_malloc(250);
+		}
+		my_malloc(10);
+		my_malloc(10);
+		my_malloc(10);
+		my_malloc(10);
+	}
 	if (0)
 	{
 		char *s = malloc(0);
