@@ -8,7 +8,7 @@
 // TODO move defines to another file, and utils, and bonus(?)
 //  remember to make Makefile and check with 42 flags
 // and check if malloc(0) does really malloc something if so change if size == 0 in my_malloc function
-//! add getrlimit
+//! add getrlimit protection only once, if its -1 then fuck ittttt? or just ignore and check mmap != -1
 
 #define BUCKET_SIZE sizeof(t_bucket) //! kind of useless
 #define ZONE_SIZE sizeof(t_zone)
@@ -21,6 +21,8 @@
 #define ALLOCATIONS 105
 #define TINY_ZONE_SIZE (((ALLOCATIONS * (BLOCK_SIZE + TINY_SIZE) + ZONE_SIZE) / PAGE) + 1) * PAGE
 #define SMALL_ZONE_SIZE (((ALLOCATIONS * (BLOCK_SIZE + SMALL_SIZE) + ZONE_SIZE) / PAGE) + 1) * PAGE
+
+//! change this two for an enum :)
 #define FREE 1
 #define NOTFREE 0
 
@@ -30,11 +32,18 @@
 // create func that iterates through the zones and prints info about every zone, and block.
 //! this is my old bug -> in create_block if theres not enough space to create teh last free bock it will segfault add protections somewhere -> test what happens if at the end of the zone theres not enough space for a free block
 
+typedef enum zone
+{
+	TYPE_TINY,
+	TYPE_SMALL,
+	TYPE_LARGE
+} e_zone;
+
 typedef struct s_block
 {
 	struct s_block *next;
 	struct s_block *prev;
-	char *data; //? or void???
+	char *data; //? or void??? //! seems useless for now erase? -> maybe use when coding find_zone for free
 	unsigned int size;
 	unsigned int free; // padding // could add here pointer to the start of the zone, and check free with bitwise operator in free. wouldnt need to do (ptr > zone && ptr <= zone + TINY_ZONE_SIZE)
 } t_block;			   // to check if block belogns to zone in tiny or small blocks
@@ -44,7 +53,8 @@ typedef struct s_zone
 	struct s_zone *next;
 	t_block *block;
 	size_t free_space;
-	size_t type; // padding // same as in tiny
+	e_zone type;
+	int padding; // !padding maybe useless in certain machines -> test!
 } t_zone;
 
 // TODO
@@ -61,7 +71,7 @@ t_bucket allocs;
 
 // TODO
 // if called on max size_t this returns 0 check it out -> compare to malloc
-// change name? align_memory?
+//! change name? align_memory?
 size_t go_next_block(size_t size)
 {
 	return (size + 15) & ~15;
@@ -72,6 +82,9 @@ size_t go_next_block(size_t size)
 //? change zone to ** pointer to not need allocs.tiny or small here?
 void my_free(void *ptr)
 {
+	// ! 1- change free to FREE, add (size + BLOCK_SIZE) to free_space
+	// ! 2- find zone of the alloc, if free_space == type_zone_size - ZONE_SIZE and ( large or more than one zone type like that (small, tiny) then munmap
+	// ! 	2a- if munmap update linked list
 	if (ptr == NULL)
 		return;
 	t_block *metadata = ptr - BLOCK_SIZE;
@@ -120,9 +133,9 @@ t_block *create_block(t_block *ptr, t_block *prev, t_block *next, size_t size, s
 }
 
 //! OLD BUG -> in create_block if theres not enough space to create teh last free bock it will segfault add protections somewhere -> test what happens if at the end of the zone theres not enough space for a free block
+// ? do i add get_zone_type here to add zone type directly here
 void *create_zone(size_t type_zone_size)
 {
-	printf("create_zone with size: %d\n", type_zone_size);
 	t_zone *zone = mmap(NULL, type_zone_size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0); //! -1 here bc of MAP_ANONYMOUS
 	if (zone == MAP_FAILED)
 	{
@@ -130,8 +143,10 @@ void *create_zone(size_t type_zone_size)
 		return NULL;
 	}
 	zone->next = NULL;
-	zone->block = NULL;							   //! block to null seems a better idea, will test now, reverse if fails
+	zone->block = NULL;
+	zone->type = get_zone_type(type_zone_size);	   //! block to null seems a better idea, will test now, reverse if fails
 	zone->free_space = type_zone_size - ZONE_SIZE; //! change me to real data
+	printf("create_zone with size: %ld and type %d \n", type_zone_size, zone->type);
 	return zone;
 }
 
@@ -142,19 +157,29 @@ void add_zone(t_zone *zone)
 	if (!current)
 	{
 		allocs.zone = zone;
-		return ;
+		return;
 	}
 	while (current->next)
 	{
-		current = current->next; 
+		current = current->next;
 	}
 	current->next = zone;
+}
+
+//? rework this
+int get_zone_type(size_t size)
+{
+	//! change this uglyyyy
+	return (0 * (size <= TINY_ZONE_SIZE)) +
+		   (1 * (size > TINY_ZONE_SIZE) && (size <= SMALL_ZONE_SIZE)) +
+		   (2 * (size > SMALL_ZONE_SIZE));
 }
 
 // TODO
 //  cut this into smaller funcs, its frankenstein monster
 // the logic to create the first block and push the last block maybe could be almost the same
-void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
+//! void *create_tiny_small(t_zone **zone, size_t size) -> new func, could even erase **zone param... as it will be always be allocs.zone
+void *create_tiny_small(t_zone **zone, size_t size)
 {
 	/*
 	Iterate through zones to check if theres enough space for data:
@@ -166,6 +191,7 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 
 	//! this while loop can be done better ti think its 2 am -> do i keep >= or keep it safe but ugly with > as with >= maybe i get out of space
 	//! move this to its own function
+	// check here when changing to one zone, and if zone is the type we need
 	while (current && BLOCK_SIZE + size > current->free_space)
 	{
 		// ! should be erased
@@ -187,6 +213,9 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 		// 	printf("Second malloc failed\n");
 		// 	return NULL;
 		// }
+		//! this is wrong for now, when we change to one zone change ittttt
+		size_t type_zone_size = get_zone_type(size); //! here need to get size of the zone i want to malloc, huw ? ******
+		// ? do another func taht from the zone type returns the zone size?
 		current = create_zone(type_zone_size);
 		*zone = current;
 		printf("create zone first malloc found enough space in zone %ld free space %ld\n", current, current->free_space);
@@ -259,14 +288,14 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t type_zone_size)
 
 // TODO
 //! or return memory address
-//? theres a better way to do this
-//! add protection to be called only once i forgot about that l000l
+//? theres a better way to do this - rework
+//! change protection to be called only once i forgot about that l000l
 void *init()
 {
 	// code this better
-	if (allocs.tiny)
+	if (allocs.zone)
 	{
-		return allocs.tiny;
+		return allocs.zone;
 	}
 	t_zone *tiny = create_zone(TINY_ZONE_SIZE);
 	t_zone *tiny2 = create_zone(TINY_ZONE_SIZE);
@@ -276,8 +305,13 @@ void *init()
 		return NULL;
 	}
 
-	allocs.tiny = tiny;
-	allocs.tiny->next = tiny2;
+	// void add_zone(t_zone *zone)
+	// ? call add zone instead of manually adding it
+	add_zone(tiny);
+	add_zone(tiny2);
+
+	// allocs.zone = tiny;
+	// allocs.zone->next = tiny2;
 	// printf("pre malloc with tiny 1 %ld size %ld\n", allocs.tiny, allocs.tiny->free_space);
 	// printf("pre malloc with tiny 2 %ld size %ld\n", allocs.tiny->next, allocs.tiny->next->free_space);
 
@@ -289,8 +323,11 @@ void *init()
 		return NULL;
 	}
 
-	allocs.small = small;
-	allocs.small->next = small2;
+	add_zone(small);
+	add_zone(small2);
+
+	// allocs.zone->next->next = small;
+	// allocs.zone->next->next->next = small2;
 	// printf("pre malloc with small 1 %ld size %ld\n", allocs.small, allocs.small->free_space);
 	// printf("pre malloc with small 2 %ld size %ld\n", allocs.small->next, allocs.small->next->free_space);
 	return tiny;
@@ -308,7 +345,7 @@ void *my_malloc(size_t size)
 	//! or this?
 	if (!size)
 		return NULL;
-	if (init() == false)
+	if (init() == false) //? change to new *zone
 		return NULL;
 	// if (size == 0) //! is this necessary, does malloc do this check? its diff on each fucking pc wtf
 	// size++;
@@ -318,13 +355,13 @@ void *my_malloc(size_t size)
 	{
 		// const size_t type_zone_size = TINY_ZONE_SIZE; //! erase me later when erase printf
 		// printf("me tiny %lu %d\n", allocs.tiny, size, type_zone_size);
-		ret = create_tiny_small(&allocs.tiny, size, TINY_ZONE_SIZE); // check if tiny doesnt exist if it does check tehres space if there is use this
+		ret = create_tiny_small(&allocs.zone, size); // check if tiny doesnt exist if it does check tehres space if there is use this
 	}
 	else if (size <= SMALL_SIZE)
 	{
 		// const size_t type_zone_size = SMALL_ZONE_SIZE; //! erase me later when erase printf
 		// printf("me smoll %lu %d\n", allocs.small, size, type_zone_size);
-		ret = create_tiny_small(&allocs.small, size, SMALL_ZONE_SIZE); // check if tiny doesnt exist if it does check tehres space if there is use this
+		ret = create_tiny_small(&allocs.zone, size); // check if tiny doesnt exist if it does check tehres space if there is use this
 	}
 	else
 	{
