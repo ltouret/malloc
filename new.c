@@ -67,6 +67,16 @@ typedef struct s_bucket
 
 t_bucket allocs;
 
+//? get zone of that block
+// void *get_zone()
+
+void my_free(void *ptr) {
+	if (ptr == NULL)
+		return;
+	t_block *metadata = ptr - BLOCK_SIZE;
+	t_zone *zone = NULL;
+}
+
 // TODO
 // if called on max size_t this returns 0 check it out -> compare to malloc
 //! change name? align_memory?
@@ -77,7 +87,7 @@ size_t go_next_block(size_t size)
 
 // TODO
 //! forgot to change allocs.tiny, small or large to null if all is freed so this does segfault if i free all and try to use my_malloc again
-//? change zone to ** pointer to not need allocTINY_ZONE_SIZE
+//? change zone to ** pointer to not need alloc
 
 t_block *create_block(t_block *ptr, t_block *prev, t_block *next, size_t size, size_t free)
 {
@@ -92,7 +102,7 @@ t_block *create_block(t_block *ptr, t_block *prev, t_block *next, size_t size, s
 // get_zone_type + get_zone_size could be merged maybe:
 // i mean they are always needed together so............
 // return e_zone?
-int get_zone_type(size_t size)
+e_zone get_zone_type(size_t size)
 {
 	//! change this uglyyyy
 	return (0 * (size <= TINY_SIZE)) +
@@ -117,26 +127,8 @@ size_t get_zone_size(e_zone type, size_t large_alloc)
 		// ? change to big
 		// size = SMALL_ZONE_SIZE; //! wrong here return LARGE changed to the closest PAGE SIZE
 	}
-	printf("large malloc is: type %d size: %ld\n", type, size);
+	// printf("get_zone_size malloc is: type %d size: %ld\n", type, size);
 	return size;
-}
-
-//! OLD BUG -> in create_block if theres not enough space to create teh last free bock it will segfault add protections somewhere -> test what happens if at the end of the zone theres not enough space for a free block
-// ? do i add get_zone_type here to add zone type directly here
-void *create_zone(size_t zone_size, e_zone type)
-{
-	t_zone *zone = mmap(NULL, zone_size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0); //! -1 here bc of MAP_ANONYMOUS
-	if (zone == MAP_FAILED)
-	{
-		printf("create_zone failed, zone size %ld\n", zone_size);
-		return NULL;
-	}
-	zone->next = NULL;
-	zone->block = NULL; //! block to null seems a better idea, will test now, reverse if fails
-	zone->type = type;
-	zone->free_space = zone_size - ZONE_SIZE; //! change me to real data
-	printf("create_zone with size: %ld and type %d \n", zone_size, zone->type);
-	return zone;
 }
 
 void add_zone(t_zone *zone)
@@ -155,6 +147,38 @@ void add_zone(t_zone *zone)
 	current->next = zone;
 }
 
+//! OLD BUG -> in create_block if theres not enough space to create teh last free bock it will segfault add protections somewhere -> test what happens if at the end of the zone theres not enough space for a free block
+// ? do i add get_zone_type here to add zone type directly here
+void *create_zone(size_t size, e_zone zone_type)
+{
+	size_t zone_size = get_zone_size(zone_type, size); //! here need to get size of the zone i want to malloc, huw ? ******
+	t_zone *zone = mmap(NULL, zone_size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0); //! -1 here bc of MAP_ANONYMOUS
+	if (zone == MAP_FAILED)
+	{
+		printf("create_zone failed, zone size %ld\n", zone_size);
+		return NULL;
+	}
+	zone->next = NULL;
+	zone->block = NULL; //! block to null seems a better idea, will test now, reverse if fails
+	zone->type = zone_type;
+	zone->free_space = zone_size - ZONE_SIZE;
+	add_zone(zone);
+	printf("create_zone with size: %ld and type %d \n", zone_size, zone->type);
+	return zone;
+}
+
+void *create_large(t_zone **zone, size_t size)
+{
+	t_zone *current = create_zone(size + BLOCK_SIZE, TYPE_LARGE);
+	t_block *ptr = create_block((void *)current + ZONE_SIZE, NULL, NULL, size, NOTFREE);
+	current->block = ptr;
+	// current->block = (void *)current + ZONE_SIZE;
+	current->free_space = 0;
+	//! test this with print here
+	printf("first head malloc found enough space in zone %ld free space %ld block size %ld\n", current, current->free_space, ptr->size);
+	return (void *)ptr + BLOCK_SIZE;
+}
+
 // TODO
 //  cut this into smaller funcs, its frankenstein monster
 // the logic to create the first block and push the last block maybe could be almost the same
@@ -169,7 +193,7 @@ void *create_tiny_small(t_zone **zone, size_t size)
 	//! change var name to curr_zone
 	t_zone *current = *zone;
 	size_t zone_type = get_zone_type(size); //! here need to get size of the zone i want to malloc, huw ? ******
-	printf("type %ld\n", zone_type);
+	printf("type %ld ", zone_type);
 
 	//! this while loop can be done better ti think its 2 am -> do i keep >= or keep it safe but ugly with > as with >= maybe i get out of space
 	//! move this to its own function
@@ -189,11 +213,9 @@ void *create_tiny_small(t_zone **zone, size_t size)
 	if (!current)
 	{
 		//! this is wrong for now, when we change to one zone change ittttt
-		size_t zone_size = get_zone_size(zone_type, size); //! here need to get size of the zone i want to malloc, huw ? ******
-		// ? do another func taht from the zone type returns the zone size?
-		current = create_zone(zone_size, zone_type);
-		add_zone(current);
-		printf("create zone first malloc found enough space in zone %ld free space %ld\n", current, current->free_space);
+		// ? do another func that from the zone type returns the zone size?
+		current = create_zone(size, zone_type);
+		printf("first malloc zone enough space in zone %ld free space %ld %d\n", current, current->free_space, size + BLOCK_SIZE <= current->free_space);
 		// return NULL;
 		// create_zone_plus_block(current, type_zone_size - ZONE_SIZE);
 	}
@@ -265,6 +287,7 @@ void *create_tiny_small(t_zone **zone, size_t size)
 //! or return memory address
 //? theres a better way to do this - rework
 //! change protection to be called only once i forgot about that l000l
+//? what do i return here, check in my_malloc if allocs.zone != NULL?
 void *init()
 {
 	// code this better
@@ -282,8 +305,8 @@ void *init()
 
 	// void add_zone(t_zone *zone)
 	// ? call add zone instead of manually adding it
-	add_zone(tiny);
-	add_zone(tiny2);
+	// add_zone(tiny);
+	// add_zone(tiny2);
 
 	// allocs.zone = tiny;
 	// allocs.zone->next = tiny2;
@@ -298,14 +321,14 @@ void *init()
 		return NULL;
 	}
 
-	add_zone(small);
-	add_zone(small2);
+	// add_zone(small);
+	// add_zone(small2);
 
 	// allocs.zone->next->next = small;
 	// allocs.zone->next->next->next = small2;
 	// printf("pre malloc with small 1 %ld size %ld\n", allocs.small, allocs.small->free_space);
 	// printf("pre malloc with small 2 %ld size %ld\n", allocs.small->next, allocs.small->next->free_space);
-	return tiny;
+	return allocs.zone;
 }
 
 // TODO
@@ -344,7 +367,7 @@ void *my_malloc(size_t size)
 		// ????
 		//! Write a function to allocate large zones.
 		printf("me large %ld\n", size);
-		ret = create_tiny_small(&allocs.zone, size); // check if tiny doesnt exist if it does check tehres space if there is use this
+		ret = create_large(&allocs.zone, size); // check if tiny doesnt exist if it does check tehres space if there is use this
 	}
 	return ret;
 }
@@ -357,8 +380,13 @@ void *my_malloc(size_t size)
 int main()
 {
 	printf("tiny %d small %d \n", TINY_ZONE_SIZE, SMALL_ZONE_SIZE);
-	my_malloc(100000);
-	// my_malloc(10);
+	my_malloc(8192);
+	printf("\n");
+	my_malloc(4097);
+	printf("\n");
+	my_malloc(10);
+	printf("\n");
+	my_malloc(10);
 	// my_malloc(100);
 	// my_malloc(10);
 	//! with this i can use all the free_space of a zone! should be used for testing with free later.
