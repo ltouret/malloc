@@ -31,6 +31,7 @@
 // ADD tree after each malloc with size and pointer to go through each time and do the full block in half the time
 // create func that iterates through the zones and prints info about every zone, and block.
 //! this is my old bug -> in create_block if theres not enough space to create teh last free bock it will segfault add protections somewhere -> test what happens if at the end of the zone theres not enough space for a free block
+// void *create_large(t_zone **zone, size_t size) -> change to just *zone no need for double pointer, same for create tiny, mayvbe even erase as sometimes not needed
 
 typedef enum zone
 {
@@ -67,14 +68,64 @@ typedef struct s_bucket
 
 t_bucket allocs;
 
+//? rework this
+size_t get_zone_size(e_zone type, size_t large_alloc)
+{
+	//! change this uglyyyy -> to switch
+	size_t size = 0;
+	if (type == TYPE_TINY) {
+		size = TINY_ZONE_SIZE;
+	} else if (type == TYPE_SMALL) {
+		size = SMALL_ZONE_SIZE;
+	} else {
+		// size_t mask = ~(PAGE_SIZE - 1);
+		// size = (large_alloc + (page_size - 1)) & mask;
+  		size = (large_alloc + (PAGE_SIZE - 1)) & ~(PAGE_SIZE - 1);
+		printf("large malloc is: %ld\n", size);
+		// ? change to big
+		// size = SMALL_ZONE_SIZE; //! wrong here return LARGE changed to the closest PAGE SIZE
+	}
+	// printf("get_zone_size malloc is: type %d size: %ld\n", type, size);
+	return size;
+}
+
+//? rework this
+// get_zone_type + get_zone_size could be merged maybe:
+// i mean they are always needed together so............
+// return e_zone?
+e_zone get_zone_type(size_t size)
+{
+	//! change this uglyyyy
+	return (0 * (size <= TINY_SIZE)) +
+		   (1 * ((size > TINY_SIZE) && (size <= SMALL_SIZE))) +
+		   (2 * (size > SMALL_SIZE));
+}
+
 //? get zone of that block
-// void *get_zone()
+void *get_zone(void *ptr) {
+	t_zone *current = allocs.zone;
+
+	while (current)
+	{
+		// if ((void *)current <= ptr && (void *)current + current-) {
+
+		// }
+		current = current->next;
+	}
+	return current;
+}
 
 void my_free(void *ptr) {
 	if (ptr == NULL)
 		return;
-	t_block *metadata = ptr - BLOCK_SIZE;
+	t_block *metadata = (void *)ptr - BLOCK_SIZE;
+	e_zone = get_zone_type(metadata);
+	printf("free: block type %ld", e_zone);
+	// if 
+
 	t_zone *zone = NULL;
+	get_zone(ptr);
+	// if ()
 }
 
 // TODO
@@ -96,39 +147,6 @@ t_block *create_block(t_block *ptr, t_block *prev, t_block *next, size_t size, s
 	ptr->size = size;
 	ptr->free = free;
 	return ptr;
-}
-
-//? rework this
-// get_zone_type + get_zone_size could be merged maybe:
-// i mean they are always needed together so............
-// return e_zone?
-e_zone get_zone_type(size_t size)
-{
-	//! change this uglyyyy
-	return (0 * (size <= TINY_SIZE)) +
-		   (1 * ((size > TINY_SIZE) && (size <= SMALL_SIZE))) +
-		   (2 * (size > SMALL_SIZE));
-}
-
-//? rework this
-size_t get_zone_size(e_zone type, size_t large_alloc)
-{
-	//! change this uglyyyy -> to switch
-	size_t size = 0;
-	if (type == TYPE_TINY) {
-		size = TINY_ZONE_SIZE;
-	} else if (type == TYPE_SMALL) {
-		size = SMALL_ZONE_SIZE;
-	} else {
-		// size_t mask = ~(PAGE_SIZE - 1);
-		// size = (large_alloc + (page_size - 1)) & mask;
-  		size = (large_alloc + (PAGE_SIZE - 1)) & ~(PAGE_SIZE - 1);
-		printf("large malloc is: %ld\n", size);
-		// ? change to big
-		// size = SMALL_ZONE_SIZE; //! wrong here return LARGE changed to the closest PAGE SIZE
-	}
-	// printf("get_zone_size malloc is: type %d size: %ld\n", type, size);
-	return size;
 }
 
 void add_zone(t_zone *zone)
@@ -384,9 +402,10 @@ int main()
 	printf("\n");
 	my_malloc(4097);
 	printf("\n");
-	my_malloc(10);
+	void * test = my_malloc(10);
 	printf("\n");
 	my_malloc(10);
+	my_free(test);
 	// my_malloc(100);
 	// my_malloc(10);
 	//! with this i can use all the free_space of a zone! should be used for testing with free later.
