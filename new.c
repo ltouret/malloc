@@ -116,7 +116,55 @@ void *get_zone(void *ptr, size_t type_zone_size) {
 	return current;
 }
 
+int count_zone_type(e_zone type) {
+	t_zone *current = allocs.zone;
+	int count = 0;
+
+	while (current)
+	{
+		if (current->type == type) {
+			count++;
+		}
+		current = current->next;
+	}
+	printf("count type %d count %d ", type, count);
+	return count;
+}
+
+void remove_zone(t_zone *zone) {
+	t_zone *current = allocs.zone;
+	t_zone *prev = NULL;
+
+	if (current == zone) {
+		allocs.zone = zone->next;
+		return;
+	} 
+	while (current)
+	{
+		if (current == zone) {
+			prev->next = current->next;
+			break;
+		}
+		prev = current;
+		// printf("free: zone %ld free space %ld should free %ld?\n", current, current->free_space, prev);
+		current = current->next;
+	}
+}
+
+void show_zone() {
+	t_zone *current = allocs.zone;
+
+	printf("\n");
+	while (current)
+	{
+		printf("show zone %ld free space %ld?\n", current, current->free_space);
+		current = current->next;
+	}
+	printf("\n");
+}
+
 void my_free(void *ptr) {
+	// show_zone();
 	if (ptr == NULL)
 		return;
 	t_block *metadata = (void *)ptr - BLOCK_SIZE;
@@ -130,14 +178,22 @@ void my_free(void *ptr) {
 		metadata->free = FREE;
 		zone->free_space += (metadata->size + BLOCK_SIZE);
 		printf("free: zone %ld free space %ld should free %ld?\n", zone, zone->free_space, zone->free_space == zone_size - ZONE_SIZE);
+		int count_zone = count_zone_type(zone_type);
+		if (count_zone > 1 && zone->free_space + ZONE_SIZE == zone_size) {
+			//! call munmap
+			// show_zone();
+			remove_zone(zone);
+			munmap((void *)zone, zone->free_space + ZONE_SIZE);
+			// show_zone();
+		}
 	} else {
 		//! call munmap - large
-		// printf("free: block type large %ld\n", zone_type);
-	}
-	//! 
-	// if (munmap((void *)zone, zone_size) == -1) {
-	// 	return;
-	// }
+		zone = (void *)ptr - BLOCK_SIZE - ZONE_SIZE;
+		printf("free: zone %ld free space %ld should free %ld?\n", zone, zone->free_space, 1);
+		remove_zone(zone);
+		// show_zone();
+		munmap((void *)zone, zone->free_space + ZONE_SIZE);
+  	}	
 }
 
 // TODO
@@ -175,6 +231,7 @@ void add_zone(t_zone *zone)
 		current = current->next;
 	}
 	current->next = zone;
+	printf("add zone %ld free space %ld\n", zone, zone->free_space);
 }
 
 //! OLD BUG -> in create_block if theres not enough space to create teh last free bock it will segfault add protections somewhere -> test what happens if at the end of the zone theres not enough space for a free block
@@ -193,7 +250,7 @@ void *create_zone(size_t size, e_zone zone_type)
 	zone->type = zone_type;
 	zone->free_space = zone_size - ZONE_SIZE;
 	add_zone(zone);
-	printf("create_zone with size: %ld and type %d \n", zone_size, zone->type);
+	printf("create_zone with size: %ld and type %d\n", zone_size, zone->type);
 	return zone;
 }
 
@@ -203,9 +260,8 @@ void *create_large(t_zone **zone, size_t size)
 	t_block *ptr = create_block((void *)current + ZONE_SIZE, NULL, NULL, size, NOTFREE);
 	current->block = ptr;
 	// current->block = (void *)current + ZONE_SIZE;
-	current->free_space = 0;
 	//! test this with print here
-	printf("first head malloc found enough space in zone %ld free space %ld block size %ld\n", current, current->free_space, ptr->size);
+	printf("create large in zone %ld free space %ld block size %ld\n", current, current->free_space, ptr->size);
 	return (void *)ptr + BLOCK_SIZE;
 }
 
@@ -414,14 +470,38 @@ int main()
 	test = my_malloc(8192);
 	my_free(test);
 	printf("\n");
-	my_malloc(4097);
-	printf("\n");
+	test = my_malloc(4097);
+	my_free(test);
+
+		// show_zone();
+			show_zone();
+
 	test = my_malloc(10);
 	my_free(test);
-	printf("\n");
-	my_malloc(10);
+		test = my_malloc(2000);
 	my_free(test);
 	printf("\n");
+	printf("\n");
+
+			show_zone();
+
+		for (size_t i = 0; i < 114; i++)
+		{
+			test = my_malloc(250);
+		}
+		my_free(test);
+			test = my_malloc(250);
+
+			show_zone();
+
+
+	// printf("\n");
+	// test = my_malloc(10);
+	// my_free(test);
+	// printf("\n");
+	// my_malloc(10);
+	// // my_free(test);
+	// printf("\n");
 	// my_malloc(100);
 	// my_malloc(10);
 	//! with this i can use all the free_space of a zone! should be used for testing with free later.
