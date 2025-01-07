@@ -15,7 +15,7 @@
 #define BLOCK_SIZE sizeof(t_block)
 #define PAGE_SIZE sysconf(_SC_PAGESIZE)
 
-#define TINY_SIZE 256
+#define TINY_SIZE 256 //! change this to 1/4 of pagesize and small to pagesize 
 #define SMALL_SIZE 4096 // should be more
 // #define LARGE_SIZE 5400 // should be more
 #define ALLOCATIONS 105
