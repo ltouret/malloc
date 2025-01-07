@@ -151,6 +151,7 @@ void remove_zone(t_zone *zone) {
 	}
 }
 
+//! remove later
 void show_zone() {
 	t_zone *current = allocs.zone;
 
