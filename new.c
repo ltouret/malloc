@@ -44,7 +44,8 @@ typedef struct s_block
 {
 	struct s_block *next;
 	struct s_block *prev;
-	char *data; //? or void??? //! seems useless for now erase? -> maybe use when coding find_zone for free
+	size_t user_size;
+	// char *data; //? or void??? //! seems useless for now erase? -> maybe use when coding find_zone for free
 	unsigned int size;
 	unsigned int free; // padding // could add here pointer to the start of the zone, and check free with bitwise operator in free. wouldnt need to do (ptr > zone && ptr <= zone + TINY_ZONE_SIZE)
 } t_block;			   // to check if block belogns to zone in tiny or small blocks
@@ -67,6 +68,101 @@ typedef struct s_bucket
 } t_bucket;
 
 t_bucket allocs;
+
+void write_nb_base(unsigned int nb, unsigned int base)
+{
+    char string[10];
+    int digit;
+    int i;
+
+    i = 0;
+	if (nb == 0) {
+        string[i] = '0';
+		i++;
+	}
+
+    while (nb > 0)
+    {
+        digit = nb % base;
+        if (digit > 9)
+        {
+            digit -= 10;
+            string[i] = digit + 'A';
+        }
+        else
+        {
+            string[i] = digit + '0';
+        }
+        i++;
+
+        nb /= base;
+    }
+
+    if (base == 16)
+    {
+        string[i] = 'x';
+        i++;
+        string[i] = '0';
+        i++;
+    }
+
+    i--;
+    while (i >= 0)
+    {
+        write(1, &(string[i]), 1);
+        i--;
+    }
+}
+
+size_t print_blocks(t_block *block)
+{
+	size_t counter = 0;
+    while (block)
+    {
+		if (block->free == FREE) {
+			break;
+		}
+        write_nb_base((unsigned long)block + BLOCK_SIZE, 16);
+        write(1, " - ", 3);
+        write_nb_base((unsigned long)block + BLOCK_SIZE + block->size, 16);
+        write(1, " : ", 3);
+        write_nb_base(block->size, 10);
+        write(1, " bytes\n", 7);
+
+		counter += block->user_size;
+        block = block->next;
+    }
+	return counter;
+}
+
+void show_alloc_mem()
+{
+	t_zone *zone = allocs.zone;
+	size_t counter = 0;
+    while (zone)
+    {
+        switch (zone->type) {
+            case TYPE_TINY:
+                write(1, "TINY : ", 7);
+                break;
+            case TYPE_SMALL:
+                write(1, "SMALL : ", 8);
+                break;
+            case TYPE_LARGE:
+                write(1, "LARGE : ", 8);
+                break;
+        }
+
+        write_nb_base((unsigned long)zone + ZONE_SIZE, 16);
+        write(1, "\n", 1);
+
+        counter += print_blocks(zone->block);
+        zone = zone->next;
+    }
+    write(1, "Total : ", 8);
+    write_nb_base(counter, 10);
+    write(1, " bytes\n", 7);
+}
 
 //? rework this
 size_t get_zone_size(e_zone type, size_t large_alloc)
@@ -206,7 +302,6 @@ size_t go_next_block(size_t size)
 }
 
 // TODO
-//! forgot to change allocs.tiny, small or large to null if all is freed so this does segfault if i free all and try to use my_malloc again
 //? change zone to ** pointer to not need alloc
 
 t_block *create_block(t_block *ptr, t_block *prev, t_block *next, size_t size, size_t free)
@@ -309,11 +404,13 @@ void *create_tiny_small(t_zone **zone, size_t size)
 	//! case 1 -> !found a zone where there is enough, add data
 	if (current && current->type == zone_type && size + BLOCK_SIZE <= current->free_space) //! the second condition is overkill as it used in the while to get the current free zone
 	{
-		printf("found enough space in zone %ld free space %ld\n", current, current->free_space);
+		// printf("found enough space in zone %ld free space %ld\n", current, current->free_space);
 
 		//! what do i do if its the first block of the zone, example zone was created by init, theres no block info in ****
 
 		t_block *curr_block = current->block;
+		printf("found enough space in zone %ld free space %ld, block %ld\n", current, current->free_space, curr_block);
+
 
 		// first block in zone
 		if (!curr_block)
@@ -324,16 +421,18 @@ void *create_tiny_small(t_zone **zone, size_t size)
 			// current->block = (void *)current + ZONE_SIZE;
 			current->free_space -= (size + BLOCK_SIZE);
 			//! test this with print here
-			printf("first head malloc found enough space in zone %ld free space %ld\n", current, current->free_space);
+			printf("first head malloc found enough space in zone %ld %ld size %ld\n", current, ptr, ptr->size);
 			return (void *)ptr + BLOCK_SIZE;
 		}
 		// add here now the while loop to find the next free zone or null
 		//? what happens if the last block is free and i want to write the data there, it wont go into the loop so could fail, edge case!!!
-		while (curr_block->next && size > curr_block->size)
+		while (curr_block->next)
 		{
 			//? maybe can add this condition in the loop directly
-			// if (curr_block->free == FREE)
-			// break;
+			if (curr_block->free == FREE && size <= curr_block->size) {
+				break;
+			}
+			// printf("block %ld block size %ld free space %ld\n", curr_block, curr_block->size, current->free_space);
 			curr_block = curr_block->next;
 		}
 		// else block exists and is free
@@ -358,10 +457,11 @@ void *create_tiny_small(t_zone **zone, size_t size)
 			// if new block?
 			//! create new block
 			//? problem with new block prev
-			t_block *ptr = create_block((void *)curr_block + size + BLOCK_SIZE, curr_block, NULL, size, NOTFREE);
+			t_block *ptr = create_block((void *)curr_block + curr_block->size + BLOCK_SIZE, curr_block, NULL, size, NOTFREE);
 			curr_block->next = ptr;
 			current->free_space -= (size + BLOCK_SIZE);
-			printf("new block malloc found enough space in zone %ld free space %ld\n", ptr->prev, current->free_space);
+			// printf("new block malloc %ld new block %ld prev %ld next %ld size %ld\n", curr_block, (void *)curr_block + curr_block->size + BLOCK_SIZE, 
+				// curr_block->next->prev, curr_block->next, curr_block->size);
 			return (void *)ptr + BLOCK_SIZE;
 		}
 	}
@@ -468,34 +568,42 @@ int main()
 {
 	void *test;
 	printf("tiny %d small %d \n", TINY_ZONE_SIZE, SMALL_ZONE_SIZE);
-	test = my_malloc(8192);
-	my_free(test);
-	printf("\n");
-	test = my_malloc(4097);
-	my_free(test);
+	// test = my_malloc(8192);
+	// my_free(test);
+	// printf("\n");
+	// test = my_malloc(4097);
+	// my_free(test);
 
 		// show_zone();
-			show_zone();
+			// show_zone();
 
-	test = my_malloc(10);
-	my_free(test);
-		test = my_malloc(2000);
-	my_free(test);
+	// test = my_malloc(10);
+	// my_free(test);
+		// test = my_malloc(2000);
+	// my_free(test);
 	printf("\n");
 	printf("\n");
 
-			show_zone();
+			// show_zone();
 
 		for (size_t i = 0; i < 114; i++)
 		{
-			test = my_malloc(250);
+			// test = my_malloc(250);
 		}
-		my_free(test);
-			test = my_malloc(250);
+		// my_free(test);
+			test = my_malloc(10);
+			// my_free(test);
+			test = my_malloc(10);
+		// my_free(test);
+		// my_free(test);
+			// test = my_malloc(10);
+			// test = my_malloc(10);
 
-			show_zone();
+			// show_zone();
 
-
+	printf("\n");
+	printf("\n");
+	show_alloc_mem();
 	// printf("\n");
 	// test = my_malloc(10);
 	// my_free(test);

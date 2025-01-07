@@ -1,65 +1,40 @@
-# **************************************************************************** #
-#                                                                              #
-#                                                         :::      ::::::::    #
-#    Makefile                                           :+:      :+:    :+:    #
-#                                                     +:+ +:+         +:+      #
-#    By: ltouret <ltouret@student.42.fr>            +#+  +:+       +#+         #
-#                                                 +#+#+#+#+#+   +#+            #
-#    Created: 2022/09/19 22:51:45 by ltouret           #+#    #+#              #
-#    Updated: 2022/09/19 23:11:02 by ltouret          ###   ########.fr        #
-#                                                                              #
-# **************************************************************************** #
-
 ifeq ($(HOSTTYPE),)
 	HOSTTYPE := $(shell uname -m)_$(shell uname -s)
 endif
 
-.SUFFIXES:
-.SUFFIXES: .c .o
+NAME = libft_malloc_${HOSTTYPE}.so
+SLINK = libft_malloc.so
 
-NAME = malloc
-
-#NAME = libft_malloc_$(HOSTTYPE).so
-#LIB_NAME = libft_malloc.so
-
-SRCS = main.c
+SRCS = test.c
 
 OBJS = ${SRCS:.c=.o}
 
 CC		= cc
 RM		= rm -f
+LN		= ln -s
+CP		= cp
 
-CFLAGS = -Wall -Wextra -Werror
-
-FSAN = -fsanitize=address
-
-LIBFT_FLAGS	= -Llibft -lft
-
-INCLUDES	= -I libft
+CFLAGS = -Wall -Wextra -Werror -g3 -fPIC
 
 .c.o:
-		${CC} ${INCLUDES} ${CFLAGS} -c $< -o ${<:.c=.o}
+		${CC} ${CFLAGS} -c $< -o ${<:.c=.o}
 
 $(NAME): ${OBJS}
-		make -C libft 
-		${CC} ${OBJS} ${LIBFT_FLAGS} -o ${NAME}
+		${CC} -shared -o ${NAME} ${OBJS}
+		${LN} ${NAME} ${SLINK}
 
 all:	${NAME}
 
 clean:
-		make -C libft clean
 		${RM} ${OBJS}
 
 fclean:	clean
-		rm -f libft/libft.a
-		${RM} ${NAME}
+		${RM} ${NAME} ${SLINK}
 
 re:		fclean all
 
-test:	all
-		@./malloc
+install:
+		${CP} libft_malloc_*.so /usr/lib/
+		${LN} /usr/lib/libft_malloc_*.so /usr/lib/${SLINK}
 
-strace:	all
-		@strace ./malloc
-
-.PHONY: all clean fclean re test strace
+.PHONY : all clean fclean re
