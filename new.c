@@ -15,8 +15,8 @@
 #define BLOCK_SIZE sizeof(t_block)
 #define PAGE_SIZE sysconf(_SC_PAGESIZE)
 
-#define TINY_SIZE 256 //! change this to 1/4 of pagesize and small to pagesize 
-#define SMALL_SIZE 4096 // should be more
+#define TINY_SIZE PAGE_SIZE / 4 //! change this to 1/4 of pagesize and small to pagesize 
+#define SMALL_SIZE PAGE_SIZE // should be more
 // #define LARGE_SIZE 5400 // should be more
 #define ALLOCATIONS 105
 #define TINY_ZONE_SIZE (((ALLOCATIONS * (BLOCK_SIZE + TINY_SIZE) + ZONE_SIZE) / PAGE_SIZE) + 1) * PAGE_SIZE
@@ -124,9 +124,9 @@ size_t print_blocks(t_block *block)
 		}
         write_nb_base((unsigned long)block + BLOCK_SIZE, 16);
         write(1, " - ", 3);
-        write_nb_base((unsigned long)block + BLOCK_SIZE + block->size, 16);
+        write_nb_base((unsigned long)block + BLOCK_SIZE + block->user_size, 16);
         write(1, " : ", 3);
-        write_nb_base(block->size, 10);
+        write_nb_base(block->user_size, 10);
         write(1, " bytes\n", 7);
 
 		counter += block->user_size;
@@ -296,7 +296,7 @@ void my_free(void *ptr) {
 // TODO
 // if called on max size_t this returns 0 check it out -> compare to malloc
 //! change name? align_memory?
-size_t go_next_block(size_t size)
+size_t align_memory(size_t size)
 {
 	return (size + 15) & ~15;
 }
@@ -304,11 +304,12 @@ size_t go_next_block(size_t size)
 // TODO
 //? change zone to ** pointer to not need alloc
 
-t_block *create_block(t_block *ptr, t_block *prev, t_block *next, size_t size, size_t free)
+t_block *create_block(t_block *ptr, t_block *prev, t_block *next, size_t size,  size_t user_size, size_t free)
 {
 	ptr->prev = prev;
 	ptr->next = next;
 	ptr->size = size;
+	ptr->user_size = user_size;
 	ptr->free = free;
 	return ptr;
 }
@@ -350,12 +351,11 @@ void *create_zone(size_t size, e_zone zone_type)
 	return zone;
 }
 
-void *create_large(t_zone **zone, size_t size)
+void *create_large(t_zone **zone, size_t size, size_t user_size)
 {
 	t_zone *current = create_zone(size + BLOCK_SIZE, TYPE_LARGE);
-	t_block *ptr = create_block((void *)current + ZONE_SIZE, NULL, NULL, size, NOTFREE);
+	t_block *ptr = create_block((void *)current + ZONE_SIZE, NULL, NULL, size, user_size, NOTFREE);
 	current->block = ptr;
-	// current->block = (void *)current + ZONE_SIZE;
 	//! test this with print here
 	printf("create large in zone %ld free space %ld block size %ld\n", current, current->free_space, ptr->size);
 	return (void *)ptr + BLOCK_SIZE;
@@ -365,7 +365,7 @@ void *create_large(t_zone **zone, size_t size)
 //  cut this into smaller funcs, its frankenstein monster
 // the logic to create the first block and push the last block maybe could be almost the same
 //! void *create_tiny_small(t_zone **zone, size_t size) -> new func, could even erase **zone param... as it will be always be allocs.zone
-void *create_tiny_small(t_zone **zone, size_t size)
+void *create_tiny_small(t_zone **zone, size_t size, size_t user_size)
 {
 	/*
 	Iterate through zones to check if theres enough space for data:
@@ -416,7 +416,7 @@ void *create_tiny_small(t_zone **zone, size_t size)
 		if (!curr_block)
 		{
 			//? clean this
-			t_block *ptr = create_block((void *)current + ZONE_SIZE, NULL, NULL, size, NOTFREE);
+			t_block *ptr = create_block((void *)current + ZONE_SIZE, NULL, NULL, size, user_size, NOTFREE);
 			current->block = ptr;
 			// current->block = (void *)current + ZONE_SIZE;
 			current->free_space -= (size + BLOCK_SIZE);
@@ -457,7 +457,7 @@ void *create_tiny_small(t_zone **zone, size_t size)
 			// if new block?
 			//! create new block
 			//? problem with new block prev
-			t_block *ptr = create_block((void *)curr_block + curr_block->size + BLOCK_SIZE, curr_block, NULL, size, NOTFREE);
+			t_block *ptr = create_block((void *)curr_block + curr_block->size + BLOCK_SIZE, curr_block, NULL, size, user_size, NOTFREE);
 			curr_block->next = ptr;
 			current->free_space -= (size + BLOCK_SIZE);
 			// printf("new block malloc %ld new block %ld prev %ld next %ld size %ld\n", curr_block, (void *)curr_block + curr_block->size + BLOCK_SIZE, 
@@ -526,52 +526,77 @@ void *init()
 void *my_malloc(size_t size)
 {
 	void *ret = NULL;
+	size_t user_size = size;
 
-	//! or this?
-	if (!size)
+	// NULL may also be returned by a successful call to malloc() with a size of zero
+	if (size == 0)
 		return NULL;
 	if (init() == false) //? change to new *zone
 		return NULL;
 	// if (size == 0) //! is this necessary, does malloc do this check? its diff on each fucking pc wtf
 	// size++;
-	size = go_next_block(size); //! check what to do if max size_t
-	printf("asked malloc of size %zu: \n", size);
+	size = align_memory(size); //! check what to do if max size_t
+	printf("asked malloc of size %zu: %ld \n", size, user_size);
 	//! change this remove ifs, only call create_malloc
 	if (size <= TINY_SIZE)
 	{
 		// const size_t type_zone_size = TINY_ZONE_SIZE; //! erase me later when erase printf
 		// printf("me tiny %lu %d\n", allocs.tiny, size, type_zone_size);
-		ret = create_tiny_small(&allocs.zone, size); // check if tiny doesnt exist if it does check tehres space if there is use this
+		ret = create_tiny_small(&allocs.zone, size, user_size); // check if tiny doesnt exist if it does check tehres space if there is use this
 	}
 	else if (size <= SMALL_SIZE)
 	{
 		// const size_t type_zone_size = SMALL_ZONE_SIZE; //! erase me later when erase printf
 		// printf("me smoll %lu %d\n", allocs.small, size, type_zone_size);
-		ret = create_tiny_small(&allocs.zone, size); // check if tiny doesnt exist if it does check tehres space if there is use this
+		ret = create_tiny_small(&allocs.zone, size, user_size); // check if tiny doesnt exist if it does check tehres space if there is use this
 	}
 	else
 	{
 		// ????
 		//! Write a function to allocate large zones.
 		printf("me large %ld\n", size);
-		ret = create_large(&allocs.zone, size); // check if tiny doesnt exist if it does check tehres space if there is use this
+		ret = create_large(&allocs.zone, size, user_size); // check if tiny doesnt exist if it does check tehres space if there is use this
 	}
 	return ret;
 }
 
+
+/*
+The realloc() function changes the size of the memory block pointed to by ptr to size bytes.
+The contents will be unchanged in the range from the start of the region up to the minimum of the old and new sizes.
+If the new size is larger than the old size, the added memory will not be initialized.
+// If ptr is NULL, then the call is equivalent to malloc(size), for all values of size;
+// if size is equal to zero, and ptr is not NULL, then the call is equivalent to free(ptr).
+// Unless ptr is NULL, it must have been returned by an earlier call to malloc(), calloc() or realloc().
+If the area pointed to was moved, a free(ptr) is done.
+*/
+
+//! code memcpy from libft - make header files
+//! If realloc() fails the original block is left untouched; it is not freed or moved.
+void *my_realloc(void *ptr, size_t size)
+{
+	if (ptr && size == 0) {
+		my_free(ptr);
+	}
+	if (!ptr) {
+		my_malloc(size);
+	}
+	return NULL; // catchall
+}
+
 //! remove me later
 // #define DEBUG
-#include <string.h>
-#include <malloc.h>
+// #include <string.h>
+// #include <malloc.h>
 
 int main()
 {
 	void *test;
 	printf("tiny %d small %d \n", TINY_ZONE_SIZE, SMALL_ZONE_SIZE);
-	// test = my_malloc(8192);
+	test = my_malloc(8003);
 	// my_free(test);
 	// printf("\n");
-	// test = my_malloc(4097);
+	test = my_malloc(3000);
 	// my_free(test);
 
 		// show_zone();
