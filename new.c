@@ -102,14 +102,15 @@ e_zone get_zone_type(size_t size)
 }
 
 //? get zone of that block
-void *get_zone(void *ptr) {
+void *get_zone(void *ptr, size_t type_zone_size) {
 	t_zone *current = allocs.zone;
 
 	while (current)
 	{
-		// if ((void *)current <= ptr && (void *)current + current-) {
-
-		// }
+		if ((void *)current <= ptr && (void *)current + type_zone_size > ptr) {
+			printf("free: block found on zone %ld\n", current);
+			break;
+		}
 		current = current->next;
 	}
 	return current;
@@ -119,13 +120,24 @@ void my_free(void *ptr) {
 	if (ptr == NULL)
 		return;
 	t_block *metadata = (void *)ptr - BLOCK_SIZE;
-	e_zone = get_zone_type(metadata);
-	printf("free: block type %ld", e_zone);
-	// if 
-
-	t_zone *zone = NULL;
-	get_zone(ptr);
-	// if ()
+	//! get zone size could work with size as parameter this is bad
+	e_zone zone_type = get_zone_type(metadata->size);
+	size_t zone_size = get_zone_size(zone_type, 0);
+	t_zone *zone = get_zone(ptr, zone_size);
+	printf("free: block type %ld\n", zone_type);
+	if (zone_type < TYPE_LARGE) {
+		//! tiny - small, change flag to FREE, change free_space += size, if zone is all freed and theres more zone of that type then munmap
+		metadata->free = FREE;
+		zone->free_space += (metadata->size + BLOCK_SIZE);
+		printf("free: zone %ld free space %ld should free %ld?\n", zone, zone->free_space, zone->free_space == zone_size - ZONE_SIZE);
+	} else {
+		//! call munmap - large
+		// printf("free: block type large %ld\n", zone_type);
+	}
+	//! 
+	// if (munmap((void *)zone, zone_size) == -1) {
+	// 	return;
+	// }
 }
 
 // TODO
@@ -397,15 +409,19 @@ void *my_malloc(size_t size)
 
 int main()
 {
+	void *test;
 	printf("tiny %d small %d \n", TINY_ZONE_SIZE, SMALL_ZONE_SIZE);
-	my_malloc(8192);
+	test = my_malloc(8192);
+	my_free(test);
 	printf("\n");
 	my_malloc(4097);
 	printf("\n");
-	void * test = my_malloc(10);
+	test = my_malloc(10);
+	my_free(test);
 	printf("\n");
 	my_malloc(10);
 	my_free(test);
+	printf("\n");
 	// my_malloc(100);
 	// my_malloc(10);
 	//! with this i can use all the free_space of a zone! should be used for testing with free later.
