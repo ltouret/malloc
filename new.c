@@ -643,7 +643,7 @@ void *my_realloc(void *ptr, size_t size)
         return NULL;
 	}
 	metadata = (void *)ptr - BLOCK_SIZE;
-	// printf("realloc %ld size %ld user_size %ld\n", metadata, size, metadata->user_size);
+	printf("realloc %ld size %ld user_size %ld\n", metadata, size, metadata->user_size);
 	if (size == metadata->user_size) {
 		return ptr;
 	}
@@ -658,110 +658,133 @@ void *my_realloc(void *ptr, size_t size)
 // #include <string.h>
 // #include <malloc.h>
 
-int main()
+#define M 1024 * 1024
+
+void	print(char *s)
 {
-	void *test = NULL;
-	void *test2 = "hey";
-    test = my_realloc(test2, 0);
-	my_free(test);
-    // show_alloc_mem();
-    // test = my_realloc(test, 5);
-	// my_free(test);
-    // show_alloc_mem();
-    // test = my_realloc(test, 5);
-	// my_free(test);
-    // show_alloc_mem();
-    // test = my_realloc(test, 4);
-	// my_free(test);
-    // test = my_realloc(test, 6);
-	// my_free(test);
-	// test = my_malloc(1);
-	// my_free(test);
-	// test = my_malloc(1);
-	// my_free(test);
-    // show_alloc_mem();
-    // test = my_realloc(test, 5);
-    // test = my_realloc (test2, 0);
-	// test2 = "hey";
-	// my_free(test);
-    show_alloc_mem();
-	if (0) {
-        printf("tiny %d small %d \n", TINY_ZONE_SIZE, SMALL_ZONE_SIZE);
-        test = my_malloc(8003);
-        // my_free(test);
-        // printf("\n");
-        test = my_malloc(3000);
-        // my_free(test);
-
-            // show_zone();
-                // show_zone();
-
-        // test = my_malloc(10);
-        // my_free(test);
-            // test = my_malloc(2000);
-        // my_free(test);
-        printf("\n");
-        printf("\n");
-
-                // show_zone();
-
-            for (size_t i = 0; i < 114; i++)
-            {
-                // test = my_malloc(250);
-            }
-            // my_free(test);
-                test = my_malloc(10);
-                // my_free(test);
-                test = my_malloc(10);
-            // my_free(test);
-            // my_free(test);
-                // test = my_malloc(10);
-                // test = my_malloc(10);
-
-                // show_zone();
-
-        printf("\n");
-        printf("\n");
-        show_alloc_mem();
-        // printf("\n");
-        // test = my_malloc(10);
-        // my_free(test);
-        // printf("\n");
-        // my_malloc(10);
-        // // my_free(test);
-        // printf("\n");
-        // my_malloc(100);
-        // my_malloc(10);
-        //! with this i can use all the free_space of a zone! should be used for testing with free later.
-	}
-	if (0)
-	{
-		my_malloc(10);
-		for (size_t i = 0; i < 113; i++)
-		{
-			my_malloc(250);
-		}
-		my_malloc(10);
-		my_malloc(10);
-		my_malloc(10);
-		my_malloc(10);
-	}
-	if (0)
-	{
-		char *s = malloc(0);
-		s[0] = '1';
-		s[1] = '1';
-		s[2] = '\0';
-		printf("%s\n", s);
-		struct rlimit old_lim, lim, new_lim;
-		printf("page_size %d\n", sysconf(_SC_PAGESIZE));
-		if (getrlimit(RLIMIT_AS, &old_lim) == 0)
-			printf("Old limits -> soft limit= %ld \t"
-				   " hard limit= %ld \n",
-				   old_lim.rlim_cur, old_lim.rlim_max);
-		if (getrlimit(RLIMIT_DATA, &old_lim) == 0)
-			printf("Old limits -> soft limit= %ld \t"
-				   " hard limit= %ld \n",
-				   old_lim.rlim_cur, old_lim.rlim_max);
-	}
+	write(1, s, strlen(s));
 }
+
+int		main(void)
+{
+	char *addr1;
+	char *addr2;
+	char *addr3;
+
+	addr1 = my_malloc(16 * M);
+	strcpy(addr1, "Bonjours\n");
+	print(addr1);
+	addr2 = my_malloc(16 * M);
+	addr3 = my_realloc(addr1, 128 * M);
+	addr3[127 * M] = 42;
+	print(addr3);
+	return (0);
+}
+
+// int main()
+// {
+// 	void *test = NULL;
+// 	void *test2 = "hey";
+//     test = my_realloc(test2, 0);
+// 	my_free(test);
+//     // show_alloc_mem();
+//     // test = my_realloc(test, 5);
+// 	// my_free(test);
+//     // show_alloc_mem();
+//     // test = my_realloc(test, 5);
+// 	// my_free(test);
+//     // show_alloc_mem();
+//     // test = my_realloc(test, 4);
+// 	// my_free(test);
+//     // test = my_realloc(test, 6);
+// 	// my_free(test);
+// 	// test = my_malloc(1);
+// 	// my_free(test);
+// 	// test = my_malloc(1);
+// 	// my_free(test);
+//     // show_alloc_mem();
+//     // test = my_realloc(test, 5);
+//     // test = my_realloc (test2, 0);
+// 	// test2 = "hey";
+// 	// my_free(test);
+//     show_alloc_mem();
+// 	if (0) {
+//         printf("tiny %d small %d \n", TINY_ZONE_SIZE, SMALL_ZONE_SIZE);
+//         test = my_malloc(8003);
+//         // my_free(test);
+//         // printf("\n");
+//         test = my_malloc(3000);
+//         // my_free(test);
+
+//             // show_zone();
+//                 // show_zone();
+
+//         // test = my_malloc(10);
+//         // my_free(test);
+//             // test = my_malloc(2000);
+//         // my_free(test);
+//         printf("\n");
+//         printf("\n");
+
+//                 // show_zone();
+
+//             for (size_t i = 0; i < 114; i++)
+//             {
+//                 // test = my_malloc(250);
+//             }
+//             // my_free(test);
+//                 test = my_malloc(10);
+//                 // my_free(test);
+//                 test = my_malloc(10);
+//             // my_free(test);
+//             // my_free(test);
+//                 // test = my_malloc(10);
+//                 // test = my_malloc(10);
+
+//                 // show_zone();
+
+//         printf("\n");
+//         printf("\n");
+//         show_alloc_mem();
+//         // printf("\n");
+//         // test = my_malloc(10);
+//         // my_free(test);
+//         // printf("\n");
+//         // my_malloc(10);
+//         // // my_free(test);
+//         // printf("\n");
+//         // my_malloc(100);
+//         // my_malloc(10);
+//         //! with this i can use all the free_space of a zone! should be used for testing with free later.
+// 	}
+// 	if (0)
+// 	{
+// 		my_malloc(10);
+// 		for (size_t i = 0; i < 113; i++)
+// 		{
+// 			my_malloc(250);
+// 		}
+// 		my_malloc(10);
+// 		my_malloc(10);
+// 		my_malloc(10);
+// 		my_malloc(10);
+// 	}
+// 	if (0)
+// 	{
+// 		char *s = malloc(0);
+// 		s[0] = '1';
+// 		s[1] = '1';
+// 		s[2] = '\0';
+// 		printf("%s\n", s);
+// 		struct rlimit old_lim, lim, new_lim;
+// 		printf("page_size %d\n", sysconf(_SC_PAGESIZE));
+// 		if (getrlimit(RLIMIT_AS, &old_lim) == 0)
+// 			printf("Old limits -> soft limit= %ld \t"
+// 				   " hard limit= %ld \n",
+// 				   old_lim.rlim_cur, old_lim.rlim_max);
+// 		if (getrlimit(RLIMIT_DATA, &old_lim) == 0)
+// 			printf("Old limits -> soft limit= %ld \t"
+// 				   " hard limit= %ld \n",
+// 				   old_lim.rlim_cur, old_lim.rlim_max);
+// 	}
+// }
