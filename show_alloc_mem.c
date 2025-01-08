@@ -1,3 +1,5 @@
+#include "malloc.h"
+
 void write_nb_base(unsigned int nb, unsigned int base)
 {
     char string[10];
