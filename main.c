@@ -1,15 +1,9 @@
-//! move this to main test
 #include <unistd.h>
 #include <stdio.h>
 #include <string.h>
 #include "malloc.h"
 
 #define M 1024 * 1024
-
-void	print(char *s)
-{
-	write(1, s, strlen(s));
-}
 
 int		main(void)
 {
@@ -56,7 +50,7 @@ int		main(void)
     free(NULL);
     free((void *)bad_realloc + 5);
     if (realloc((void *)bad_realloc + 5, 10) == NULL) {
-        print("Bonjour\n");
+        printf("Bonjour\n");
     }
     // free(bad_realloc);
 	show_alloc_mem();
