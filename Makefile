@@ -4,6 +4,7 @@ endif
 
 NAME = libft_malloc_${HOSTTYPE}.so
 SLINK = libft_malloc.so
+EXEC_TEST = test_malloc
 
 SRCS = malloc.c realloc.c shared.c free.c show_alloc_mem.c
 
@@ -30,6 +31,7 @@ clean:
 
 fclean:	clean
 		${RM} ${NAME} ${SLINK}
+		${RM} ${EXEC_TEST}
 
 re:		fclean all
 
@@ -37,4 +39,8 @@ install:
 		${CP} libft_malloc_*.so /usr/lib/
 		${LN} /usr/lib/libft_malloc_*.so /usr/lib/${SLINK}
 
-.PHONY : all clean fclean re
+test:   all
+		${CC} ${CFLAGS} -l ft_malloc -L. main.c -o ${EXEC_TEST}
+		LD_LIBRARY_PATH=. ./${EXEC_TEST}
+
+.PHONY : all clean fclean re install test
