@@ -198,7 +198,7 @@ e_zone get_zone_type(size_t size)
 }
 
 //? get zone of that block
-void *get_zone(void *ptr, size_t type_zone_size) {
+void *get_zone_of_block(void *ptr, size_t type_zone_size) {
 	t_zone *current = allocs.zone;
 
 	while (current)
@@ -212,6 +212,26 @@ void *get_zone(void *ptr, size_t type_zone_size) {
 	return current;
 }
 
+void *get_block(t_block *ptr)
+{
+	t_zone *curr_zone = allocs.zone;
+	while (curr_zone) {
+		t_block *curr_block = curr_zone->block;
+		while (curr_block)
+		{
+			// if (curr_block->free == FREE) {
+				// break;
+			// }
+			if ((void *)ptr == (void *)curr_block + BLOCK_SIZE) {
+				return ptr;
+			}
+			curr_block = curr_block->next;
+		}
+		curr_zone = curr_zone->next;
+	}
+	return NULL;
+}
+
 int count_zone_type(e_zone type) {
 	t_zone *current = allocs.zone;
 	int count = 0;
@@ -223,7 +243,7 @@ int count_zone_type(e_zone type) {
 		}
 		current = current->next;
 	}
-	printf("count type %d count %d ", type, count);
+	// printf("count type %d count %d ", type, count);
 	return count;
 }
 
@@ -247,7 +267,7 @@ void remove_zone(t_zone *zone) {
 	}
 }
 
-//! remove later
+//! remove later *********
 void show_zone() {
 	t_zone *current = allocs.zone;
 
@@ -264,11 +284,18 @@ void my_free(void *ptr) {
 	// show_zone();
 	if (ptr == NULL)
 		return;
+	if (get_block(ptr) == NULL) {
+		printf("NOPE %ld\n", ptr);
+		return;
+	}
 	t_block *metadata = (void *)ptr - BLOCK_SIZE;
+	if (metadata->free == FREE) {
+		return;
+	}
 	//! get zone size could work with size as parameter this is bad
 	e_zone zone_type = get_zone_type(metadata->size);
 	size_t zone_size = get_zone_size(zone_type, 0);
-	t_zone *zone = get_zone(ptr, zone_size);
+	t_zone *zone = get_zone_of_block(ptr, zone_size);
 	printf("free: block type %ld\n", zone_type);
 	if (zone_type < TYPE_LARGE) {
 		//! tiny - small, change flag to FREE, change free_space += size, if zone is all freed and theres more zone of that type then munmap
@@ -286,7 +313,7 @@ void my_free(void *ptr) {
 	} else {
 		//! call munmap - large
 		zone = (void *)ptr - BLOCK_SIZE - ZONE_SIZE;
-		printf("free: zone %ld free space %ld should free %ld?\n", zone, zone->free_space, 1);
+		printf("free: zone %ld free space %ld should free %ld?\n", zone, zone->free_space, zone->free_space == zone_size - ZONE_SIZE);
 		remove_zone(zone);
 		// show_zone();
 		munmap((void *)zone, zone->free_space + ZONE_SIZE);
@@ -317,7 +344,7 @@ t_block *create_block(t_block *ptr, t_block *prev, t_block *next, size_t size,  
 void add_zone(t_zone *zone)
 {
 	t_zone *current = allocs.zone;
-
+	printf("add zone %ld free space %ld\n", zone, zone->free_space);
 	if (!current)
 	{
 		allocs.zone = zone;
@@ -328,7 +355,6 @@ void add_zone(t_zone *zone)
 		current = current->next;
 	}
 	current->next = zone;
-	printf("add zone %ld free space %ld\n", zone, zone->free_space);
 }
 
 //! OLD BUG -> in create_block if theres not enough space to create teh last free bock it will segfault add protections somewhere -> test what happens if at the end of the zone theres not enough space for a free block
@@ -560,14 +586,39 @@ void *my_malloc(size_t size)
 	return ret;
 }
 
+void	*ft_memmove(void *dst, const void *src, size_t len)
+{
+	unsigned int	i;
+
+	if (!dst && !src)
+		return (NULL);
+	if (dst > src)
+	{
+		while (len > 0)
+		{
+			((char *)dst)[len - 1] = ((char *)src)[len - 1];
+			len--;
+		}
+	}
+	else
+	{
+		i = 0;
+		while (i < len)
+		{
+			((char *)dst)[i] = ((char *)src)[i];
+			i++;
+		}
+	}
+	return (dst);
+}
 
 /*
 The realloc() function changes the size of the memory block pointed to by ptr to size bytes.
 The contents will be unchanged in the range from the start of the region up to the minimum of the old and new sizes.
-If the new size is larger than the old size, the added memory will not be initialized.
-// If ptr is NULL, then the call is equivalent to malloc(size), for all values of size;
-// if size is equal to zero, and ptr is not NULL, then the call is equivalent to free(ptr).
-// Unless ptr is NULL, it must have been returned by an earlier call to malloc(), calloc() or realloc().
+// -- If the new size is larger than the old size, the added memory will not be initialized.
+// -- If ptr is NULL, then the call is equivalent to malloc(size), for all values of size;
+// -- if size is equal to zero, and ptr is not NULL, then the call is equivalent to free(ptr).
+// -- Unless ptr is NULL, it must have been returned by an earlier call to malloc(), calloc() or realloc().
 If the area pointed to was moved, a free(ptr) is done.
 */
 
@@ -575,13 +626,30 @@ If the area pointed to was moved, a free(ptr) is done.
 //! If realloc() fails the original block is left untouched; it is not freed or moved.
 void *my_realloc(void *ptr, size_t size)
 {
-	if (ptr && size == 0) {
-		my_free(ptr);
+    size_t user_size = size;
+	t_block *block = get_block(ptr);
+	t_block *new_block;
+
+	block->data_size > size ? size : block->data_size
+	if (block == NULL) {
+		return NULL;
 	}
 	if (!ptr) {
-		my_malloc(size);
+		return my_malloc(size);
 	}
-	return NULL; // catchall
+    if (size == 0) {
+		my_free(ptr);
+        return NULL;
+	}
+	printf("realloc %ld\n", block);
+	if (size == block->user_size) {
+		return ptr;
+	}
+	new_block = my_malloc(size);
+
+	ft_memmove(new_block, ptr, );	
+	my_free(block);
+	return new_block;
 }
 
 //! remove me later
@@ -592,53 +660,61 @@ void *my_realloc(void *ptr, size_t size)
 int main()
 {
 	void *test;
-	printf("tiny %d small %d \n", TINY_ZONE_SIZE, SMALL_ZONE_SIZE);
-	test = my_malloc(8003);
+	void *test2 = "hey";
+    test = my_realloc(test2, 10);
+    test = my_realloc(test2, 0);
+	test2 = "hey";
 	// my_free(test);
-	// printf("\n");
-	test = my_malloc(3000);
-	// my_free(test);
+    show_alloc_mem();
+	if (0) {
+        printf("tiny %d small %d \n", TINY_ZONE_SIZE, SMALL_ZONE_SIZE);
+        test = my_malloc(8003);
+        // my_free(test);
+        // printf("\n");
+        test = my_malloc(3000);
+        // my_free(test);
 
-		// show_zone();
-			// show_zone();
+            // show_zone();
+                // show_zone();
 
-	// test = my_malloc(10);
-	// my_free(test);
-		// test = my_malloc(2000);
-	// my_free(test);
-	printf("\n");
-	printf("\n");
+        // test = my_malloc(10);
+        // my_free(test);
+            // test = my_malloc(2000);
+        // my_free(test);
+        printf("\n");
+        printf("\n");
 
-			// show_zone();
+                // show_zone();
 
-		for (size_t i = 0; i < 114; i++)
-		{
-			// test = my_malloc(250);
-		}
-		// my_free(test);
-			test = my_malloc(10);
-			// my_free(test);
-			test = my_malloc(10);
-		// my_free(test);
-		// my_free(test);
-			// test = my_malloc(10);
-			// test = my_malloc(10);
+            for (size_t i = 0; i < 114; i++)
+            {
+                // test = my_malloc(250);
+            }
+            // my_free(test);
+                test = my_malloc(10);
+                // my_free(test);
+                test = my_malloc(10);
+            // my_free(test);
+            // my_free(test);
+                // test = my_malloc(10);
+                // test = my_malloc(10);
 
-			// show_zone();
+                // show_zone();
 
-	printf("\n");
-	printf("\n");
-	show_alloc_mem();
-	// printf("\n");
-	// test = my_malloc(10);
-	// my_free(test);
-	// printf("\n");
-	// my_malloc(10);
-	// // my_free(test);
-	// printf("\n");
-	// my_malloc(100);
-	// my_malloc(10);
-	//! with this i can use all the free_space of a zone! should be used for testing with free later.
+        printf("\n");
+        printf("\n");
+        show_alloc_mem();
+        // printf("\n");
+        // test = my_malloc(10);
+        // my_free(test);
+        // printf("\n");
+        // my_malloc(10);
+        // // my_free(test);
+        // printf("\n");
+        // my_malloc(100);
+        // my_malloc(10);
+        //! with this i can use all the free_space of a zone! should be used for testing with free later.
+	}
 	if (0)
 	{
 		my_malloc(10);
