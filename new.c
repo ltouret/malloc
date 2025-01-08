@@ -268,25 +268,12 @@ void remove_zone(t_zone *zone) {
 	}
 }
 
-//! remove later *********
-void show_zone() {
-	t_zone *current = allocs.zone;
-
-	printf("\n");
-	while (current)
-	{
-		printf("show zone %ld free space %ld?\n", current, current->free_space);
-		current = current->next;
-	}
-	printf("\n");
-}
-
 void my_free(void *ptr) {
 	// show_zone();
-	if (ptr == NULL)
+	if (ptr == NULL) {
 		return;
+	}
 	if (get_block(ptr) == NULL) {
-		printf("NOPE %ld\n", ptr);
 		return;
 	}
 	t_block *metadata = (void *)ptr - BLOCK_SIZE;
@@ -566,24 +553,18 @@ void *my_malloc(size_t size)
 	size = align_memory(size); //! check what to do if max size_t
 	printf("asked malloc of size %zu: %ld \n", size, user_size);
 	//! change this remove ifs, only call create_malloc
-	if (size <= TINY_SIZE)
+	if (size > SMALL_SIZE)
 	{
 		// const size_t type_zone_size = TINY_ZONE_SIZE; //! erase me later when erase printf
 		// printf("me tiny %lu %d\n", allocs.tiny, size, type_zone_size);
-		ret = create_tiny_small(&allocs.zone, size, user_size); // check if tiny doesnt exist if it does check tehres space if there is use this
-	}
-	else if (size <= SMALL_SIZE)
-	{
-		// const size_t type_zone_size = SMALL_ZONE_SIZE; //! erase me later when erase printf
-		// printf("me smoll %lu %d\n", allocs.small, size, type_zone_size);
-		ret = create_tiny_small(&allocs.zone, size, user_size); // check if tiny doesnt exist if it does check tehres space if there is use this
+		printf("me large %ld\n", size);
+		ret = create_large(&allocs.zone, size, user_size); // check if tiny doesnt exist if it does check tehres space if there is use this
 	}
 	else
 	{
-		// ????
 		//! Write a function to allocate large zones.
-		printf("me large %ld\n", size);
-		ret = create_large(&allocs.zone, size, user_size); // check if tiny doesnt exist if it does check tehres space if there is use this
+		printf("me smol %ld\n", size);
+		ret = create_tiny_small(&allocs.zone, size, user_size); // check if tiny doesnt exist if it does check tehres space if there is use this
 	}
 	return ret;
 }
@@ -614,19 +595,7 @@ void	*ft_memmove(void *dst, const void *src, size_t len)
 	return (dst);
 }
 
-/*
-The realloc() function changes the size of the memory block pointed to by ptr to size bytes.
-The contents will be unchanged in the range from the start of the region up to the minimum of the old and new sizes.
-// -- If the new size is larger than the old size, the added memory will not be initialized.
-// -- If ptr is NULL, then the call is equivalent to malloc(size), for all values of size;
-// -- if size is equal to zero, and ptr is not NULL, then the call is equivalent to free(ptr).
-// -- Unless ptr is NULL, it must have been returned by an earlier call to malloc(), calloc() or realloc().
-If the area pointed to was moved, a free(ptr) is done.
-*/
-
-//! code memcpy from libft - make header files
-//! If realloc() fails the original block is left untouched; it is not freed or moved.
-void *my_realloc(void *ptr, size_t size)
+void *realloc(void *ptr, size_t size)
 {
     size_t user_size = size;
 	t_block *metadata;
@@ -643,20 +612,18 @@ void *my_realloc(void *ptr, size_t size)
         return NULL;
 	}
 	metadata = (void *)ptr - BLOCK_SIZE;
-	printf("realloc %ld size %ld user_size %ld\n", metadata, size, metadata->user_size);
+	printf("realloc %ld new size %ld user_size %ld\n", metadata, size, metadata->user_size);
 	if (size == metadata->user_size) {
 		return ptr;
 	}
 	new_block = my_malloc(size);
+	if (new_block == NULL) {
+		return ptr;
+	}
 	ft_memmove(new_block, ptr, metadata->user_size > size ? size : metadata->user_size);	
 	my_free(ptr);
 	return new_block;
 }
-
-//! remove me later
-// #define DEBUG
-// #include <string.h>
-// #include <malloc.h>
 
 #define M 1024 * 1024
 
@@ -667,124 +634,97 @@ void	print(char *s)
 
 int		main(void)
 {
-	char *addr1;
-	char *addr2;
-	char *addr3;
+	// char	*addr;
+	// char *addr1;
+	// char *addr2;
+	// char *addr3;
+	// int		i;
 
-	addr1 = my_malloc(16 * M);
-	strcpy(addr1, "Bonjours\n");
-	print(addr1);
-	addr2 = my_malloc(16 * M);
-	addr3 = my_realloc(addr1, 128 * M);
-	addr3[127 * M] = 42;
-	print(addr3);
+	// i = 0;
+	// while (i < 1024)
+	// {
+	// 	addr = (char*)my_malloc(1024);
+	// 	addr[0] = 42;
+	// 	my_free(addr);
+	// 	i++;
+	// }
+
+
+
+	// addr1 = my_malloc(16 * M);
+	// strcpy(addr1, "Bonjours\n");
+	// print(addr1);
+	// addr2 = my_malloc(16 * M);
+	// addr3 = my_realloc(addr1, 128 * M);
+	// addr3[127 * M] = 42;
+	// print(addr3);
+
+	// addr = my_malloc(16);
+	// my_free(NULL);
+	// my_free((void *)addr + 5);
+	// if (my_realloc((void *)addr + 5, 10) == NULL)
+	// 	print("Bonjours\n");
+
+
+	// my_malloc(1024);
+	// my_malloc(1024 * 32);
+	// my_malloc(1024 * 1024);
+	// my_malloc(1024 * 1024 * 16);
+	// my_malloc(1024 * 1024 * 128);
+
+	char *addr[180];
+
+  addr[0] = my_malloc(20);
+  addr[1] = my_malloc(40);
+  addr[2] = my_malloc(4);
+  addr[3] = my_malloc(15);
+  addr[4] = my_malloc(42);
+  addr[5] = my_malloc(89);
+  addr[6] = my_malloc(589);
+  addr[7] = my_malloc(400);
+  addr[8] = my_malloc(123);
+  show_alloc_mem();
+
+  my_free(addr[0]);
+  my_free(addr[3]);
+  my_free(addr[5]);
+  my_free(addr[7]);
+  show_alloc_mem();
+
+  addr[0] = my_malloc(42);
+  addr[3] = my_malloc(2000);
+  addr[5] = my_malloc(10000);
+  printf("------------- s_a_m -------------\n");
+  show_alloc_mem();
+
+  strncpy(addr[1], "Ceci est un test", 30);
+  printf("le contenu de la zone de 40 octets: |%s|\n", addr[1]);
+
+  addr[9] = realloc(addr[1], 156);
+  printf("------------- s_a_m -------------\n");
+  show_alloc_mem();
+
+  printf("le contenu de la zone de 40 octets devenu 156: |%s|\n", addr[9]);
+  printf("le contenu de l'ancienne zone mémoire de la zone de 40 octets"\
+      " devenu 156: |%s|\n",
+      addr[1]);
+	show_alloc_mem();
+
+
+//   int i = 0;
+//   for (i = 0; i < 180; i++)
+//     addr[i] = malloc(42);
+//   for (i = 0; i < 180; i++)
+//     addr[i] = malloc(642 + (i % 4));
+//   for (i = 0; i < 180; i++)
+//     addr[i] = malloc(14292 + (i % 400));
+//   for (i = 0; i < 180; i++)
+//     free(addr[i]);
+//   addr[0] = malloc(420133);
+//   for (i = 0; i < 80; i++)
+//     addr[i] = malloc(3);
+//   show_alloc_mem();
+
+
 	return (0);
 }
-
-// int main()
-// {
-// 	void *test = NULL;
-// 	void *test2 = "hey";
-//     test = my_realloc(test2, 0);
-// 	my_free(test);
-//     // show_alloc_mem();
-//     // test = my_realloc(test, 5);
-// 	// my_free(test);
-//     // show_alloc_mem();
-//     // test = my_realloc(test, 5);
-// 	// my_free(test);
-//     // show_alloc_mem();
-//     // test = my_realloc(test, 4);
-// 	// my_free(test);
-//     // test = my_realloc(test, 6);
-// 	// my_free(test);
-// 	// test = my_malloc(1);
-// 	// my_free(test);
-// 	// test = my_malloc(1);
-// 	// my_free(test);
-//     // show_alloc_mem();
-//     // test = my_realloc(test, 5);
-//     // test = my_realloc (test2, 0);
-// 	// test2 = "hey";
-// 	// my_free(test);
-//     show_alloc_mem();
-// 	if (0) {
-//         printf("tiny %d small %d \n", TINY_ZONE_SIZE, SMALL_ZONE_SIZE);
-//         test = my_malloc(8003);
-//         // my_free(test);
-//         // printf("\n");
-//         test = my_malloc(3000);
-//         // my_free(test);
-
-//             // show_zone();
-//                 // show_zone();
-
-//         // test = my_malloc(10);
-//         // my_free(test);
-//             // test = my_malloc(2000);
-//         // my_free(test);
-//         printf("\n");
-//         printf("\n");
-
-//                 // show_zone();
-
-//             for (size_t i = 0; i < 114; i++)
-//             {
-//                 // test = my_malloc(250);
-//             }
-//             // my_free(test);
-//                 test = my_malloc(10);
-//                 // my_free(test);
-//                 test = my_malloc(10);
-//             // my_free(test);
-//             // my_free(test);
-//                 // test = my_malloc(10);
-//                 // test = my_malloc(10);
-
-//                 // show_zone();
-
-//         printf("\n");
-//         printf("\n");
-//         show_alloc_mem();
-//         // printf("\n");
-//         // test = my_malloc(10);
-//         // my_free(test);
-//         // printf("\n");
-//         // my_malloc(10);
-//         // // my_free(test);
-//         // printf("\n");
-//         // my_malloc(100);
-//         // my_malloc(10);
-//         //! with this i can use all the free_space of a zone! should be used for testing with free later.
-// 	}
-// 	if (0)
-// 	{
-// 		my_malloc(10);
-// 		for (size_t i = 0; i < 113; i++)
-// 		{
-// 			my_malloc(250);
-// 		}
-// 		my_malloc(10);
-// 		my_malloc(10);
-// 		my_malloc(10);
-// 		my_malloc(10);
-// 	}
-// 	if (0)
-// 	{
-// 		char *s = malloc(0);
-// 		s[0] = '1';
-// 		s[1] = '1';
-// 		s[2] = '\0';
-// 		printf("%s\n", s);
-// 		struct rlimit old_lim, lim, new_lim;
-// 		printf("page_size %d\n", sysconf(_SC_PAGESIZE));
-// 		if (getrlimit(RLIMIT_AS, &old_lim) == 0)
-// 			printf("Old limits -> soft limit= %ld \t"
-// 				   " hard limit= %ld \n",
-// 				   old_lim.rlim_cur, old_lim.rlim_max);
-// 		if (getrlimit(RLIMIT_DATA, &old_lim) == 0)
-// 			printf("Old limits -> soft limit= %ld \t"
-// 				   " hard limit= %ld \n",
-// 				   old_lim.rlim_cur, old_lim.rlim_max);
-// 	}
-// }
