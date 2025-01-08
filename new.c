@@ -1,45 +1,4 @@
-#include <sys/mman.h>
-#include <unistd.h>
-
-#define ZONE_SIZE sizeof(t_zone)
-#define BLOCK_SIZE sizeof(t_block)
-#define PAGE_SIZE sysconf(_SC_PAGESIZE)
-
-#define TINY_SIZE PAGE_SIZE / 4
-#define SMALL_SIZE PAGE_SIZE
-#define ALLOCATIONS 105
-#define TINY_ZONE_SIZE (((ALLOCATIONS * (BLOCK_SIZE + TINY_SIZE) + ZONE_SIZE) / PAGE_SIZE) + 1) * PAGE_SIZE
-#define SMALL_ZONE_SIZE (((ALLOCATIONS * (BLOCK_SIZE + SMALL_SIZE) + ZONE_SIZE) / PAGE_SIZE) + 1) * PAGE_SIZE
-
-#define FREE 1
-#define NOTFREE 0
-
-typedef enum zone
-{
-	TYPE_TINY,
-	TYPE_SMALL,
-	TYPE_LARGE
-} e_zone;
-
-typedef struct s_block
-{
-	struct s_block *next;
-	struct s_block *prev;
-	size_t user_size;
-	unsigned int size;
-	unsigned int free;
-} t_block;
-
-typedef struct s_zone
-{
-	struct s_zone *next;
-	t_block *block;
-	size_t free_space;
-	e_zone type;
-	int padding;
-} t_zone;
-
-t_zone *allocs;
+#include "malloc.h"
 
 void write_nb_base(unsigned int nb, unsigned int base)
 {
@@ -219,7 +178,7 @@ void remove_zone(t_zone *zone)
 	}
 }
 
-void my_free(void *ptr)
+void free(void *ptr)
 {
 	if (ptr == NULL) {
 		return;
@@ -292,7 +251,7 @@ void *create_zone(size_t size, e_zone zone_type)
 	return zone;
 }
 
-void *create_large(t_zone **zone, size_t size, size_t user_size)
+void *create_large(size_t size, size_t user_size)
 {
 	t_zone *curr_zone = create_zone(size + BLOCK_SIZE, TYPE_LARGE);
 	t_block *ptr = create_block((void *)curr_zone + ZONE_SIZE, NULL, NULL, size, user_size, NOTFREE);
@@ -300,9 +259,9 @@ void *create_large(t_zone **zone, size_t size, size_t user_size)
 	return (void *)ptr + BLOCK_SIZE;
 }
 
-void *create_tiny_small(t_zone **zone, size_t size, size_t user_size)
+void *create_tiny_small(size_t size, size_t user_size)
 {
-	t_zone *curr_zone = *zone;
+	t_zone *curr_zone = allocs;
 	size_t zone_type = get_zone_type(size);
 	while (curr_zone) {
 		if (curr_zone->type == zone_type && BLOCK_SIZE + size < curr_zone->free_space) {
@@ -323,7 +282,6 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t user_size)
 			return (void *)ptr + BLOCK_SIZE;
 		}
 		while (curr_block->next) {
-			//? maybe can add this condition in the loop directly
 			if (curr_block->free == FREE && size <= curr_block->size) {
 				break;
 			}
@@ -365,7 +323,7 @@ void *init()
 	return allocs;
 }
 
-void *my_malloc(size_t size)
+void *malloc(size_t size)
 {
 	void *ret = NULL;
 	size_t user_size = size;
@@ -377,10 +335,10 @@ void *my_malloc(size_t size)
 		return NULL;
 	}
 	if (size > SMALL_SIZE) {
-		ret = create_large(&allocs, size, user_size);
+		ret = create_large(size, user_size);
 	}
 	else {
-		ret = create_tiny_small(&allocs, size, user_size);
+		ret = create_tiny_small(size, user_size);
 	}
 	return ret;
 }
@@ -413,34 +371,35 @@ void	*ft_memmove(void *dst, const void *src, size_t len)
 
 void *realloc(void *ptr, size_t size)
 {
-    size_t user_size = size;
 	t_block *metadata;
 	t_block *new_block;
 
 	if (!ptr) {
-		return my_malloc(size);
+		return malloc(size);
 	}
 	if (get_block(ptr) == NULL) {
 		return NULL;
 	}
     if (size == 0) {
-		my_free(ptr);
+		free(ptr);
         return NULL;
 	}
 	metadata = (void *)ptr - BLOCK_SIZE;
 	if (size == metadata->user_size) {
 		return ptr;
 	}
-	new_block = my_malloc(size);
+	new_block = malloc(size);
 	if (new_block == NULL) {
 		return ptr;
 	}
 	ft_memmove(new_block, ptr, metadata->user_size > size ? size : metadata->user_size);	
-	my_free(ptr);
+	free(ptr);
 	return new_block;
 }
-
 //! move this to main test
+#include <unistd.h>
+#include <stdio.h>
+#include <string.h>
 
 #define M 1024 * 1024
 
@@ -460,57 +419,57 @@ int		main(void)
 	// i = 0;
 	// while (i < 1024)
 	// {
-	// 	addr = (char*)my_malloc(1024);
+	// 	addr = (char*)malloc(1024);
 	// 	addr[0] = 42;
-	// 	my_free(addr);
+	// 	free(addr);
 	// 	i++;
 	// }
 
 
 
-	// addr1 = my_malloc(16 * M);
+	// addr1 = malloc(16 * M);
 	// strcpy(addr1, "Bonjours\n");
 	// print(addr1);
-	// addr2 = my_malloc(16 * M);
-	// addr3 = my_realloc(addr1, 128 * M);
+	// addr2 = malloc(16 * M);
+	// addr3 = realloc(addr1, 128 * M);
 	// addr3[127 * M] = 42;
 	// print(addr3);
 
-	// addr = my_malloc(16);
-	// my_free(NULL);
-	// my_free((void *)addr + 5);
-	// if (my_realloc((void *)addr + 5, 10) == NULL)
+	// addr = malloc(16);
+	// free(NULL);
+	// free((void *)addr + 5);
+	// if (realloc((void *)addr + 5, 10) == NULL)
 	// 	print("Bonjours\n");
 
 
-	// my_malloc(1024);
-	// my_malloc(1024 * 32);
-	// my_malloc(1024 * 1024);
-	// my_malloc(1024 * 1024 * 16);
-	// my_malloc(1024 * 1024 * 128);
+	// malloc(1024);
+	// malloc(1024 * 32);
+	// malloc(1024 * 1024);
+	// malloc(1024 * 1024 * 16);
+	// malloc(1024 * 1024 * 128);
 
 	char *addr[180];
 
-  addr[0] = my_malloc(20);
-  addr[1] = my_malloc(40);
-  addr[2] = my_malloc(4);
-  addr[3] = my_malloc(15);
-  addr[4] = my_malloc(42);
-  addr[5] = my_malloc(89);
-  addr[6] = my_malloc(589);
-  addr[7] = my_malloc(400);
-  addr[8] = my_malloc(123);
+  addr[0] = malloc(20);
+  addr[1] = malloc(40);
+  addr[2] = malloc(4);
+  addr[3] = malloc(15);
+  addr[4] = malloc(42);
+  addr[5] = malloc(89);
+  addr[6] = malloc(589);
+  addr[7] = malloc(400);
+  addr[8] = malloc(123);
   show_alloc_mem();
 
-  my_free(addr[0]);
-  my_free(addr[3]);
-  my_free(addr[5]);
-  my_free(addr[7]);
+  free(addr[0]);
+  free(addr[3]);
+  free(addr[5]);
+  free(addr[7]);
   show_alloc_mem();
 
-  addr[0] = my_malloc(42);
-  addr[3] = my_malloc(2000);
-  addr[5] = my_malloc(10000);
+  addr[0] = malloc(42);
+  addr[3] = malloc(2000);
+  addr[5] = malloc(10000);
   printf("------------- s_a_m -------------\n");
   show_alloc_mem();
 
