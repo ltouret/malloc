@@ -120,7 +120,8 @@ size_t print_blocks(t_block *block)
     while (block)
     {
 		if (block->free == FREE) {
-			break;
+	        block = block->next;
+			continue;
 		}
         write_nb_base((unsigned long)block + BLOCK_SIZE, 16);
         write(1, " - ", 3);
@@ -301,7 +302,7 @@ void my_free(void *ptr) {
 		//! tiny - small, change flag to FREE, change free_space += size, if zone is all freed and theres more zone of that type then munmap
 		metadata->free = FREE;
 		zone->free_space += (metadata->size + BLOCK_SIZE);
-		printf("free: zone %ld free space %ld should free %ld?\n", zone, zone->free_space, zone->free_space == zone_size - ZONE_SIZE);
+		printf("free: zone %ld, metadata %ld free space %ld should free %ld?\n", zone, metadata, zone->free_space, zone->free_space == zone_size - ZONE_SIZE);
 		int count_zone = count_zone_type(zone_type);
 		if (count_zone > 1 && zone->free_space + ZONE_SIZE == zone_size) {
 			//! call munmap
@@ -469,6 +470,7 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t user_size)
 			// t_block *ptr = create_block(curr_block, curr_block->prev, curr_block->next, size, NOTFREE);
 			// curr_block->size = size; //?????? do i change this value
 			curr_block->free = NOTFREE;
+			curr_block->user_size = user_size;
 			current->free_space -= (curr_block->size + BLOCK_SIZE);
 			// curr_block->next = ptr; //? is this an error?
 			printf("if free block malloc found enough space in zone %ld block size %ld free space %ld\n", current, curr_block->size, current->free_space);
@@ -486,8 +488,8 @@ void *create_tiny_small(t_zone **zone, size_t size, size_t user_size)
 			t_block *ptr = create_block((void *)curr_block + curr_block->size + BLOCK_SIZE, curr_block, NULL, size, user_size, NOTFREE);
 			curr_block->next = ptr;
 			current->free_space -= (size + BLOCK_SIZE);
-			// printf("new block malloc %ld new block %ld prev %ld next %ld size %ld\n", curr_block, (void *)curr_block + curr_block->size + BLOCK_SIZE, 
-				// curr_block->next->prev, curr_block->next, curr_block->size);
+			printf("new block malloc %ld new block %ld prev %ld next %ld size %ld\n", curr_block, (void *)curr_block + curr_block->size + BLOCK_SIZE, 
+				curr_block->next->prev, curr_block->next, curr_block->size);
 			return (void *)ptr + BLOCK_SIZE;
 		}
 	}
@@ -627,28 +629,27 @@ If the area pointed to was moved, a free(ptr) is done.
 void *my_realloc(void *ptr, size_t size)
 {
     size_t user_size = size;
-	t_block *block = get_block(ptr);
+	t_block *metadata;
 	t_block *new_block;
 
-	block->data_size > size ? size : block->data_size
-	if (block == NULL) {
-		return NULL;
-	}
 	if (!ptr) {
 		return my_malloc(size);
+	}
+	if (get_block(ptr) == NULL) {
+		return NULL;
 	}
     if (size == 0) {
 		my_free(ptr);
         return NULL;
 	}
-	printf("realloc %ld\n", block);
-	if (size == block->user_size) {
+	metadata = (void *)ptr - BLOCK_SIZE;
+	// printf("realloc %ld size %ld user_size %ld\n", metadata, size, metadata->user_size);
+	if (size == metadata->user_size) {
 		return ptr;
 	}
 	new_block = my_malloc(size);
-
-	ft_memmove(new_block, ptr, );	
-	my_free(block);
+	ft_memmove(new_block, ptr, metadata->user_size > size ? size : metadata->user_size);	
+	my_free(ptr);
 	return new_block;
 }
 
@@ -659,11 +660,29 @@ void *my_realloc(void *ptr, size_t size)
 
 int main()
 {
-	void *test;
+	void *test = NULL;
 	void *test2 = "hey";
-    test = my_realloc(test2, 10);
     test = my_realloc(test2, 0);
-	test2 = "hey";
+	my_free(test);
+    // show_alloc_mem();
+    // test = my_realloc(test, 5);
+	// my_free(test);
+    // show_alloc_mem();
+    // test = my_realloc(test, 5);
+	// my_free(test);
+    // show_alloc_mem();
+    // test = my_realloc(test, 4);
+	// my_free(test);
+    // test = my_realloc(test, 6);
+	// my_free(test);
+	// test = my_malloc(1);
+	// my_free(test);
+	// test = my_malloc(1);
+	// my_free(test);
+    // show_alloc_mem();
+    // test = my_realloc(test, 5);
+    // test = my_realloc (test2, 0);
+	// test2 = "hey";
 	// my_free(test);
     show_alloc_mem();
 	if (0) {
