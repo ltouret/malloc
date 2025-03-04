@@ -6,7 +6,7 @@ NAME = libft_malloc_${HOSTTYPE}.so
 SLINK = libft_malloc.so
 EXEC_TEST = test_malloc
 
-SRCS = malloc.c realloc.c shared.c free.c show_alloc_mem.c
+SRCS = src/malloc.c src/realloc.c src/shared.c src/free.c src/show_alloc_mem.c
 
 OBJS = ${SRCS:.c=.o}
 
@@ -15,7 +15,7 @@ RM		= rm -f
 LN		= ln -s
 CP		= cp
 
-CFLAGS = -Wall -Wextra -Werror -fPIC
+CFLAGS = -Wall -Wextra -Werror -Iinclude -fPIC
 
 .c.o:
 		${CC} ${CFLAGS} -c $< -o ${<:.c=.o}
