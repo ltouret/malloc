@@ -1,7 +1,7 @@
 # Custom Memory Allocator
 
 ## Overview
-This project implements a custom memory allocator for **Linux**, similar to `malloc`, `free`, and `realloc` in C.The implementation manages memory allocation efficiently while providing memory visualization utilities.
+This project implements a custom memory allocator for **Linux**, similar to `malloc`, `free`, and `realloc` in C. The implementation manages memory allocation efficiently while providing memory visualization utilities.
 
 ## Installation & Compilation
 To compile the project, use the provided `Makefile`:
